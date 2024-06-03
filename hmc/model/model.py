@@ -1,87 +1,60 @@
-import tensorflow as tf
-from keras import layers
-from keras.layers import Dense, Dropout, Concatenate, Input, Normalization
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
-class OutputNormalization(layers.Layer):
-    def call(self, x, **kwargs):
-        return tf.one_hot(tf.math.argmax(x, axis=1), x.shape[1], dtype=x.dtype)
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
-
-def _load_weights(model, weights_path):
-    print(model.summary())
-
-    if weights_path and tf.io.gfile.exists(f"{weights_path}.index"):
-        print(f"load weights for model {model.name}. weights_path={weights_path}")
-        model.load_weights(weights_path)
-
-    return model
-
-
-def build_cnn(feature, input_shape):
-    x: object = Normalization(input_shape=[input_shape, 1], axis=None)(feature)
-    x = layers.Conv1D(128, 3, activation='relu', padding="valid")(x)
-    x = layers.MaxPooling1D()(x)
-    x = layers.Conv1D(64, 3, activation='relu', padding="valid")(x)
-    x = layers.MaxPooling1D()(x)
-    x = layers.Conv1D(32, 3, activation='relu', padding="valid")(x)
-    x = layers.MaxPooling1D()(x)
-    x = layers.Flatten()(x)
-
-    return x
-
-
-def build_classification(x, levels_size, dropout, input_shape=1024, name='default'):
-    x: object = Dense(input_shape, activation='relu')(x)
-    x = Dropout(dropout)(x)
-    x = Dense(int(input_shape/2), activation='relu')(x)
-    x = Dropout(dropout)(x)
-    x = Dense(int(input_shape/4), activation='relu')(x)
-    x = Dropout(dropout)(x)
-    x = Dense(levels_size[name], activation='sigmoid', name=name+'_output')(x)
-
-    return x
-
-
-def build_model(levels_size: dict, sequence_size: int = 1280, dropout: float = 0.1) -> tf.keras.models.Model:
-    """
-
-    :rtype: tf.keras.models.Model
-    """
-    input_shape = (sequence_size, 1)
-    music = Input(shape=input_shape, dtype=tf.float32, name="features")
-    fcn_size = 1024
-    depth = len(levels_size)
-
-    x: object = build_cnn(music, input_shape)
-
-    # Construção das camadas sequencialmente
-    prev_output = x
-    outputs = [prev_output]
-    for level in range(1, depth + 1):
-        # Construir a camada atual
-        current_input = prev_output if level == 1 else Concatenate(axis=1)([OutputNormalization()(prev_output), x])
-        current_output = build_classification(current_input, levels_size, dropout,
-                                              input_shape=fcn_size + levels_size[f'level{level}'], name=f'level{level}')
-
-        # Atualizar a saída anterior para a próxima iteração
-        prev_output = current_output
-        outputs.append(prev_output)
-
-
-    model = tf.keras.models.Model([music], [
-        current_output,
-    ], name="Essentia")
-
-    #     _load_weights(model, weights_path)
+class OutputNormalization(nn.Module):
+    def forward(self, x):
+        return F.one_hot(torch.argmax(x, dim=1), num_classes=x.shape[1]).float()
     
-    # optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
-    model.compile(optimizer='adam',
-                   loss='binary_crossentropy', metrics=['accuracy'])
+class ClassificationBlock(nn.Module):
+    def __init__(self, input_size, output_size, dropout):
+        super(ClassificationBlock, self).__init__()
+        self.fc1 = nn.Linear(input_size, input_size)
+        self.fc2 = nn.Linear(input_size, input_size // 2)
+        self.fc3 = nn.Linear(input_size // 2, input_size // 4)
+        self.fc4 = nn.Linear(input_size // 4, output_size)
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = torch.sigmoid(self.fc4(x))
+        return x
 
-    return model
+class MusicModel(nn.Module):
+    def __init__(self, levels_size, sequence_size=1280, dropout=0.1):
+        super(MusicModel, self).__init__()
+        self.sequence_size = sequence_size
+        self.input_size = 1024
+        self.dropout = dropout
+        self.depth = len(levels_size)
+        
+        self.fc_cnn = nn.Linear(sequence_size, self.input_size)
+        
+        self.classification_blocks = nn.ModuleList()
+        for level in range(1, self.depth + 1):
+            current_input_size = self.input_size + sum(levels_size[f'level{i}'] for i in range(1, level))
+            self.classification_blocks.append(
+                ClassificationBlock(current_input_size, levels_size[f'level{level}'], dropout)
+            )
+        
+        self.output_normalization = OutputNormalization()
+    
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc_cnn(x))
+        
+        prev_output = x
+        for block in self.classification_blocks:
+            current_input = torch.cat((prev_output, x), dim=1)
+            prev_output = block(current_input)
+        
+        normalized_output = self.output_normalization(prev_output)
+        
+        return normalized_output
