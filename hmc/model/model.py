@@ -1,60 +1,67 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 class OutputNormalization(nn.Module):
-    def forward(self, x):
-        return F.one_hot(torch.argmax(x, dim=1), num_classes=x.shape[1]).float()
-    
+    def __init__(self):
+        super(OutputNormalization, self).__init__()
 
-class ClassificationBlock(nn.Module):
-    def __init__(self, input_size, output_size, dropout):
-        super(ClassificationBlock, self).__init__()
-        self.fc1 = nn.Linear(input_size, input_size)
-        self.fc2 = nn.Linear(input_size, input_size // 2)
-        self.fc3 = nn.Linear(input_size // 2, input_size // 4)
-        self.fc4 = nn.Linear(input_size // 4, output_size)
-        self.dropout = nn.Dropout(dropout)
-    
+    def forward(self, x):
+        # Obtemos a classe com a maior probabilidade
+        one_hot_encoded = torch.zeros_like(x).scatter_(1, x.argmax(dim=1, keepdim=True), 1.0)
+        return one_hot_encoded
+
+class ClassificationLayer(nn.Module):
+    def __init__(self, input_shape, size, dropout):
+        super(ClassificationLayer, self).__init__()
+        self.fc1 = nn.Linear(input_shape, 1024)
+        self.dropout1 = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(1024, 512)
+        self.dropout2 = nn.Dropout(dropout)
+        self.fc3 = nn.Linear(512, 256)
+        self.batch_norm = nn.BatchNorm1d(256)
+        self.dropout3 = nn.Dropout(dropout)
+        self.fc4 = nn.Linear(256, size)
+
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
+        x = self.dropout1(x)
         x = F.relu(self.fc2(x))
-        x = self.dropout(x)
+        x = self.dropout2(x)
         x = F.relu(self.fc3(x))
-        x = self.dropout(x)
-        x = torch.sigmoid(self.fc4(x))
+        x = self.batch_norm(x)
+        x = self.dropout3(x)
+        x = self.fc4(x)
         return x
 
 class MusicModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropout=0.1):
+    def __init__(self, levels_size, sequence_size=1280, dropout=0.6):
         super(MusicModel, self).__init__()
         self.sequence_size = sequence_size
-        self.input_size = 1024
-        self.dropout = dropout
-        self.depth = len(levels_size)
-        
-        self.fc_cnn = nn.Linear(sequence_size, self.input_size)
-        
-        self.classification_blocks = nn.ModuleList()
-        for level in range(1, self.depth + 1):
-            current_input_size = self.input_size + sum(levels_size[f'level{i}'] for i in range(1, level))
-            self.classification_blocks.append(
-                ClassificationBlock(current_input_size, levels_size[f'level{level}'], dropout)
-            )
-        
+        self.classification_layers = nn.ModuleList()
         self.output_normalization = OutputNormalization()
-    
+        self.batch_norm = nn.BatchNorm1d(sequence_size)
+        
+        for level, size in levels_size.items():
+            if level == 'level1':
+                self.classification_layers.append(ClassificationLayer(sequence_size, size, dropout))
+            else:
+                self.classification_layers.append(ClassificationLayer(sequence_size * 2, size, dropout))
+
     def forward(self, x):
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc_cnn(x))
+        outputs = []
+        current_output = x
         
-        prev_output = x
-        for block in self.classification_blocks:
-            current_input = torch.cat((prev_output, x), dim=1)
-            prev_output = block(current_input)
+        for i, classification_layer in enumerate(self.classification_layers):
+            if i > 0:
+                normalized_output = self.batch_norm(self.output_normalization(current_output))
+                normalized_output = normalized_output.repeat(1, self.sequence_size // normalized_output.shape[1])
+                current_input = torch.cat([normalized_output, x], dim=1)
+            else:
+                current_input = x
+
+            current_output = classification_layer(current_input)
+            outputs.append(current_output)
         
-        normalized_output = self.output_normalization(prev_output)
-        
-        return normalized_output
+        return outputs
+

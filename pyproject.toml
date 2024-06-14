@@ -9,13 +9,14 @@ readme = "README.md"
 python = "^3.11"
 torch = "^2.3.0"
 setuptools = "^69.0.3"
-tqdm = "4.66.1"
+tqdm = "^4.66.4"
 ipywidgets = "8.1.1"
 numpy = "^1.26.4"
 pandas = "^2.2.2"
 jupyterlab = "^4.1.8"
 jupyterlab-git = "^0.50.0"
 pydot = "^2.0.0"
+dataset = "^1.6.2"
 
 
 [build-system]
