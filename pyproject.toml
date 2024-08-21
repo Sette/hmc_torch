@@ -17,6 +17,8 @@ jupyterlab = "^4.1.8"
 jupyterlab-git = "^0.50.0"
 pydot = "^2.0.0"
 dataset = "^1.6.2"
+pytorch-lightning = "^2.3.2"
+scikit-learn = "^1.5.1"
 
 
 [build-system]

@@ -1,6 +1,7 @@
 
 import os
 import json
+import datetime
 
 def create_dir(path):
     # checking if the directory demo_folder2
@@ -16,3 +17,21 @@ def __load_json__(path):
         tmp = json.loads(f.read())
 
     return tmp
+
+def join_path(path, file):
+    if path.endswith("/") and file.startswith("/"):
+        return "{}{}".format(path, file[1:])
+    elif path.endswith("/"):
+        return "{}{}".format(path, file)
+    elif file.startswith("/"):
+        return "{}{}".format(path, file)
+    else:
+        return "{}/{}".format(path, file)
+
+
+def create_job_id():
+    # Obtém a data e hora atual
+    now = datetime.datetime.now()
+    # Formata a data e hora no formato YYYYMMDD_HHMMSS
+    job_id = now.strftime("%Y%m%d_%H%M%S")
+    return job_id

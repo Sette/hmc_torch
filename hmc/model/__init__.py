@@ -1,1 +1,1 @@
-from .model import MusicModel
+from hmc.model.model import ClassificationModel

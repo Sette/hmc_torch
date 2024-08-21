@@ -1,43 +1,35 @@
-from torch.utils.data import Dataset
+
+import os
 import torch
+from torch.utils.data import Dataset
 
-# Função parse_single_music adaptada
-def parse_single_music(data, labels):
-    track_id, categories, music = data
-    max_depth = len(categories[0])
-    data_dict = {}
-    for level in range(1, max_depth + 1):
-        level_labels = []
-        for cat in categories:
-            if cat[level-1] != "":
-                label = labels[f'label_{level}'][cat[level-1]]
-                if label not in level_labels:
-                    level_labels.append(label)
-            else:
-                if len(level_labels) == 0:
-                    level_labels.append(-1)
-        data_dict[f'label{level}'] = level_labels
+import numpy as np
 
-    data_dict['features'] = music
-    data_dict['track_id'] = track_id
+BUFFER_SIZE = 10
 
-    return data_dict
+class HMCDataset(Dataset):
+    def __init__(self, files, levels_size):
+        self.files = files
+        self.levels_size = levels_size
+        self.data = self.load_data()
 
+    def load_data(self):
+        # Carregar dados a partir dos arquivos e retornar uma lista de exemplos
+        data = []
+        for file in os.listdir(self.files):
+            file_path = os.path.join(self.files, file)
+            data.extend(torch.load(file_path))
+        return data
 
-
-# Classe personalizada do Dataset
-class MusicDataset(Dataset):
-    def __init__(self, dataframe, labels):
-        self.data = dataframe
-        self.labels = labels
-    
     def __len__(self):
         return len(self.data)
-    
+
     def __getitem__(self, idx):
-        data = self.data.iloc[idx]
-        parsed_data = parse_single_music(data, self.labels)
-        features = torch.tensor(parsed_data['features'], dtype=torch.float32)
-        labels = {key: torch.tensor(value, dtype=torch.long) for key, value in parsed_data.items() if key.startswith('label')}
-        track_id = torch.tensor(parsed_data['track_id'], dtype=torch.long)
-        return features, labels, track_id
+        example = self.data[idx]
+        features = torch.tensor(example['features'], dtype=torch.float32)
+        #track_id = example['track_id']
+        labels = [torch.tensor(np.array(example[f'level{level}']), dtype=torch.float32)
+                  for level in range(1, len(self.levels_size) + 1)]
+        return  features, labels
+
+

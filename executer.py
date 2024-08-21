@@ -2,30 +2,42 @@
 import os
 import pandas as pd
 from datetime import datetime as dt
-from hmc.utils.dir import create_dir
+from hmc.utils.dir import create_dir, create_job_id
 from hmc.model.train import run
 
 # %%
 base_path = "/mnt/disks/data/fma/trains"
-id = "hierarchical_tworoots_dev"
+id = "hierarchical_tworoots"
 
 
 # %%
 train_path = os.path.join(base_path,id)
-torch_path =os.path.join(train_path,'torch')
+torch_path = os.path.join(train_path,'torch')
 metadata_path = os.path.join(train_path,"metadata.json")
 labels_path = os.path.join(train_path,"labels.json")
 
 
+models_path = os.path.join(train_path, "models")
+
+hmc_path = os.path.join(train_path, 'hmc_torch_effnet')
+
+job_id = create_job_id()
+print(f"Job ID: {job_id}")
+
+model_path = os.path.join(hmc_path, job_id)
+create_dir(model_path)
+
+
 args = pd.Series({
     "batch_size":64,
-    "epochs":10,
-    "dropout":0.5,
-    'patience':1,
+    "epochs":15,
+    "dropout":0.1,
+    'patience':5,
     'shuffle':True,
     'max_queue_size':64,
     "labels_path": labels_path,
     "metadata_path": metadata_path,
+    "model_path": model_path,
     "train_path": os.path.join(torch_path,'train'),
     "test_path": os.path.join(torch_path,'test'),
     "val_path": os.path.join(torch_path,'val')
