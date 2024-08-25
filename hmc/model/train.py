@@ -1,10 +1,13 @@
 import json
 import os
 import torch
+import argparse
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
+
+
 class MaskedBCELoss(nn.Module):
     def __init__(self):
         super(MaskedBCELoss, self).__init__()
@@ -33,6 +36,17 @@ def run(args):
     print("========================= PyTorch =========================")
     print("GPUs available: {}".format(torch.cuda.device_count()))
     print("===========================================================")
+
+    parser = argparse.ArgumentParser(description='Train a classification model.')
+    parser.add_argument('--metadata_path', type=str, required=True, help='Path to the metadata file.')
+    parser.add_argument('--labels_path', type=str, required=True, help='Path to the labels file.')
+    parser.add_argument('--model_path', type=str, required=True, help='Path to save the best model.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
+    parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
+    parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate.')
+    parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
+
+    args = parser.parse_args()
 
     with open(args.metadata_path, 'r') as f:
         metadata = json.loads(f.read())
@@ -115,17 +129,3 @@ def run(args):
                 break
 
 
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Train a classification model.')
-    parser.add_argument('--metadata_path', type=str, required=True, help='Path to the metadata file.')
-    parser.add_argument('--labels_path', type=str, required=True, help='Path to the labels file.')
-    parser.add_argument('--model_path', type=str, required=True, help='Path to save the best model.')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
-    parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
-    parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate.')
-    parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
-
-    args = parser.parse_args()
-    run(args)
