@@ -1,22 +1,27 @@
 [tool.poetry]
-name = "hmc-torch"
+name = "hmc"
 version = "0.1.0"
 description = "Hierarchical Multi-Label Classification Network in Pytorch"
 authors = ["sette <bruno.sette@ufscar.br>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-torch = "^2.3.0"
-setuptools = "^69.0.3"
-tqdm = "4.66.1"
-ipywidgets = "8.1.1"
-numpy = "^1.26.4"
-pandas = "^2.2.2"
-jupyterlab = "^4.1.8"
-jupyterlab-git = "^0.50.0"
-pydot = "^2.0.0"
+python = "^3.10"
+setuptools = ">=70.0.0"
+tqdm = ">=4.66.4"
+numpy = ">=1.25.0"
+pandas = ">=1.5.0"
+pydot = ">=1.2.0"
+dataset = ">=1.6.2"
+scikit-learn = ">=1.2.2"
+torch = { version = ">=2.0.0", source = "pytorch" }
+torchvision = { version = ">=0.16.0", source = "pytorch" }
+torchaudio = { version = ">=2.0.0", source = "pytorch" }
 
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core"]
