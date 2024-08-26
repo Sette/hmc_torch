@@ -6,31 +6,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
+from hmc.model.losses import MaskedBCELoss, show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
 
-class MaskedBCELoss(nn.Module):
-    def __init__(self):
-        super(MaskedBCELoss, self).__init__()
-        self.bce_loss = nn.BCELoss(reduction='none')  # Redução 'none' para manter a forma do tensor
 
-    def forward(self, outputs, targets):
-        losses = []
-        for output, target in zip(outputs, targets):
-            if len(target.shape) > 1:
-                mask = target.sum(dim=1) > 0  # Dimensão 1 para targets 2D
-            else:
-                mask = target.sum() > 0  # Targets 1D ou outros casos
-
-            if mask.any():
-                loss = self.bce_loss(output, target)  # Calcula a perda sem redução
-                masked_loss = loss[mask]  # Aplica a máscara
-                losses.append(masked_loss.mean())  # Calcula a média da perda mascarada
-
-        if len(losses) > 0:
-            return torch.stack(losses).mean()  # Retorna um tensor e calcula a média
-        else:
-            return torch.tensor(0.0, requires_grad=True).to(outputs[0].device)  # Retorna uma perda zero se não houver perdas
 
 
 def run():
@@ -90,7 +70,7 @@ def run():
     best_val_loss = float('inf')
     patience_counter = 0
 
-    for epoch in range(args.epochs):
+    for epoch in range(1, args.epochs+1):
         model.train()
         global_train_loss = 0.0
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
@@ -110,6 +90,8 @@ def run():
 
         global_train_loss /= len(train_loader)
         local_train_losses = [loss/len(train_loader) for loss in local_train_losses]
+        show_local_losses(local_train_losses, set='train')
+        show_global_loss(global_train_loss, epoch, set='train')
 
         model.eval()
         global_val_loss = 0.0
@@ -126,8 +108,8 @@ def run():
 
         global_val_loss /= len(val_loader)
         local_val_losses = [loss/len(val_loader) for loss in local_val_losses]
-
-        print(f'Epoch {epoch + 1}/{args.epochs}, Global Train Loss: {global_train_loss:.4f}, Global Validation Loss: {global_val_loss:.4f}')
+        show_local_losses(local_val_losses, set='train')
+        show_global_loss(global_val_loss, epoch, set='val')
 
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss
