@@ -4,6 +4,8 @@ import torch
 import argparse
 import torch.nn as nn
 from torch.utils.data import DataLoader
+
+from executer import metadata_path
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
 from hmc.utils.dir import create_job_id, create_dir
@@ -58,6 +60,8 @@ def run():
         'sequence_size': metadata['sequence_size'],
         'dropout': args.dropout
     }
+
+    assert len(args.dropout) == metadata['max_depth']
 
     model = ClassificationModel(**params)
 

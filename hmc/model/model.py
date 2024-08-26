@@ -33,15 +33,15 @@ class BuildClassification(nn.Module):
 
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropout=0.6):
+    def __init__(self, levels_size, sequence_size=1280, dropouts=[]):
         super(ClassificationModel, self).__init__()
 
         self.sequence_size = sequence_size
-        self.dropout = dropout
+        self.dropouts = dropouts
 
         self.levels = nn.ModuleList()
         next_size = 0
-        for size in levels_size:
+        for size, dropout in zip(levels_size, dropouts):
             self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
             next_size = size
 
