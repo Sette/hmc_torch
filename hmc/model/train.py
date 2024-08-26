@@ -4,8 +4,6 @@ import torch
 import argparse
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
-from executer import metadata_path
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
 from hmc.utils.dir import create_job_id, create_dir
