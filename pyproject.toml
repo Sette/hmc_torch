@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "hmc-torch"
+name = "hmc"
 version = "0.1.0"
 description = "Hierarchical Multi-Label Classification Network in Pytorch"
 authors = ["sette <bruno.sette@ufscar.br>"]
