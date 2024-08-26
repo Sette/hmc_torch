@@ -38,15 +38,17 @@ def run(args):
     print("===========================================================")
 
     parser = argparse.ArgumentParser(description='Train a classification model.')
-    parser.add_argument('--metadata_path', type=str, required=True, help='Path to the metadata file.')
-    parser.add_argument('--labels_path', type=str, required=True, help='Path to the labels file.')
-    parser.add_argument('--model_path', type=str, required=True, help='Path to save the best model.')
+    parser.add_argument('--input_path', type=str, required=True, help='Path to data and metadata files.')
+    parser.add_argument('--output_path', type=str, required=True, help='Path to save the models.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
     parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate.')
     parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
 
     args = parser.parse_args()
+
+    args['metadata_path'] = os.path.join(args.input_path, 'metadata.json')
+    args['labels_path'] = os.path.join(args.input_path, 'labels.json')
 
     with open(args.metadata_path, 'r') as f:
         metadata = json.loads(f.read())
