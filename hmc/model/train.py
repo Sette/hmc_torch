@@ -47,13 +47,13 @@ def run():
 
     args = parser.parse_args()
 
-    args['metadata_path'] = os.path.join(args.input_path, 'metadata.json')
-    args['labels_path'] = os.path.join(args.input_path, 'labels.json')
+    metadata_path = os.path.join(args.input_path, 'metadata.json')
+    labels_path = os.path.join(args.input_path, 'labels.json')
 
-    with open(args.metadata_path, 'r') as f:
+    with open(metadata_path, 'r') as f:
         metadata = json.loads(f.read())
 
-    with open(args.labels_path, 'r') as f:
+    with open(labels_path, 'r') as f:
         labels = json.loads(f.read())
 
     params = {
