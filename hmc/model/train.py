@@ -71,6 +71,11 @@ def run():
         model = model.cuda()
         criterion = criterion.cuda()
 
+    metadata['torch_path'] = os.path.join(args.input_path, 'torch')
+    metadata['train_torch_path'] = os.path.join(args.torch_path, 'train')
+    metadata['val_torch_path'] = os.path.join(args.torch_path, 'val')
+    metadata['test_torch_path'] = os.path.join(args.torch_path, 'test')
+
     ds_train = HMCDataset(metadata['train_torch_path'], params['levels_size'])
     ds_validation = HMCDataset(metadata['val_torch_path'], params['levels_size'])
 
