@@ -56,7 +56,7 @@ def run():
     params = {
         'levels_size': labels['levels_size'],
         'sequence_size': metadata['sequence_size'],
-        'dropout': args.dropout
+        'dropouts': args.dropout
     }
 
     assert len(args.dropout) == metadata['max_depth']
