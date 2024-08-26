@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
 from hmc.utils.dir import create_job_id, create_dir
+from hmc.model.arguments import get_parser
 
 class MaskedBCELoss(nn.Module):
     def __init__(self):
@@ -40,14 +41,7 @@ def run():
     job_id = create_job_id()
     print(f"Job ID: {job_id}")
 
-    parser = argparse.ArgumentParser(description='Train a classification model.')
-    parser.add_argument('--input_path', type=str, required=True, help='Path to data and metadata files.')
-    parser.add_argument('--output_path', type=str, required=True, help='Path to save the models.')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
-    parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
-    parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate.')
-    parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
-
+    parser = get_parser()
     args = parser.parse_args()
 
     metadata_path = os.path.join(args.input_path, 'metadata.json')

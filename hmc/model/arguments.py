@@ -1,80 +1,11 @@
 import argparse
 
-
-def build():
-    ap = argparse.ArgumentParser()
-
-    ap.add_argument(
-        '--job-dir',
-        help='jobs staging path on google cloud storage',
-        required=True
-    )
-
-    ap.add_argument(
-        '--job-name',
-        help='set job name',
-        required=True
-    )
-
-    ap.add_argument(
-        '--bucket-name',
-        help='gcs bucket name',
-        required=True
-    )
-
-    ap.add_argument(
-        '--train-path',
-        help='gs://.../',
-        required=True
-    )
-
-    ap.add_argument(
-        '--trainset-pattern',
-        help='gs://.../',
-        required=True
-    )
-
-    ap.add_argument(
-        '--validationset-pattern',
-        help='gs://.../',
-        required=True
-    )
-
-    ap.add_argument(
-        '--testset-path',
-        help='gs://../testset.pk',
-        required=True
-    )
-
-    ap.add_argument(
-        '--metadata-path',
-        help='gs://../metadata.json',
-        required=True
-    )
-
-    ap.add_argument(
-        '--labels-path',
-        help='gs://../labels.json',
-        required=True
-    )
-
-    ap.add_argument(
-        '--batch-size',
-        default=32,
-        type=int
-    )
-
-    ap.add_argument(
-        '--epochs',
-        default=10,
-        type=int
-    )
-
-    ap.add_argument(
-        '--base-path',
-        required=True,
-        type=str
-    )
-
-    return ap.parse_args()
-
+def get_parser():
+    parser = argparse.ArgumentParser(description='Train a classification model.')
+    parser.add_argument('--input_path', type=str, required=True, help='Path to data and metadata files.')
+    parser.add_argument('--output_path', type=str, required=True, help='Path to save the models.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
+    parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
+    parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate.')
+    parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
+    return parser
