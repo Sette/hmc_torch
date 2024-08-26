@@ -5,8 +5,6 @@ description = "Hierarchical Multi-Label Classification Network in Pytorch"
 authors = ["sette <bruno.sette@ufscar.br>"]
 readme = "README.md"
 
-
-
 [tool.poetry.dependencies]
 python = "^3.10"
 setuptools = "^69.0.3"
