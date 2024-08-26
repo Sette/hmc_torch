@@ -1,5 +1,5 @@
 
-
+import torch
 import torch.nn as nn
 
 def show_local_losses(local_losses, set='train'):
