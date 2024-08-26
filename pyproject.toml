@@ -7,13 +7,13 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-setuptools = "^69.0.3"
+setuptools = "^70.0.0"
 tqdm = "^4.66.4"
 numpy = "^1.26.4"
 pandas = "^2.2.2"
 pydot = "^2.0.0"
 dataset = "^1.6.2"
-scikit-learn = "^1.5.1"
+scikit-learn = "^1.2.2"
 torch = { version = "^2.0.0", source = "pytorch" }
 torchvision = { version = "^0.16.0", source = "pytorch" }
 torchaudio = { version = "^2.0.0", source = "pytorch" }
