@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
-
+from hmc.utils.dir import create_job_id, create_dir
 
 class MaskedBCELoss(nn.Module):
     def __init__(self):
@@ -36,6 +36,9 @@ def run():
     print("========================= PyTorch =========================")
     print("GPUs available: {}".format(torch.cuda.device_count()))
     print("===========================================================")
+
+    job_id = create_job_id()
+    print(f"Job ID: {job_id}")
 
     parser = argparse.ArgumentParser(description='Train a classification model.')
     parser.add_argument('--input_path', type=str, required=True, help='Path to data and metadata files.')
@@ -81,6 +84,9 @@ def run():
 
     train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(ds_validation, batch_size=args.batch_size, shuffle=False)
+
+    model_path = os.path.join(args.output_path, job_id)
+    create_dir(model_path)
 
     early_stopping_patience = args.patience
     best_val_loss = float('inf')
@@ -128,7 +134,7 @@ def run():
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss
             patience_counter = 0
-            torch.save(model.state_dict(), os.path.join(args.input_path, 'best_binary.pth'))
+            torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
         else:
             patience_counter += 1
             if patience_counter >= early_stopping_patience:
