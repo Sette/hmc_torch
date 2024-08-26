@@ -32,7 +32,7 @@ class MaskedBCELoss(nn.Module):
             return torch.tensor(0.0, requires_grad=True).to(outputs[0].device)  # Retorna uma perda zero se não houver perdas
 
 
-def run(args):
+def run():
     print("========================= PyTorch =========================")
     print("GPUs available: {}".format(torch.cuda.device_count()))
     print("===========================================================")
