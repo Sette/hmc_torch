@@ -75,25 +75,25 @@ def run():
             if torch.cuda.is_available():
                 inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
             outputs = model(inputs)
-            batch_local_loss = []
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
                 loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
                 local_train_losses[index] += loss.item()
-                batch_local_loss.append(loss)
 
-            total_batch_loss = sum(batch_local_loss)
+            total_batch_loss = sum(local_train_losses)
             total_batch_loss.backward()
             optimizer.step()
 
             global_train_loss += total_batch_loss.item()
 
-        global_train_loss /= len(train_loader)
-        local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
+        global_train_loss_show = global_train_loss/len(train_loader)
+        local_train_losses_show = [loss / len(train_loader) for loss in local_train_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_train_losses, set='train')
-        show_global_loss(global_train_loss, set='train')
+        show_local_losses(local_train_losses_show, set='train')
+        show_global_loss(global_train_loss_show, set='train')
 
         model.eval()
         global_val_loss = 0.0
