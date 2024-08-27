@@ -110,7 +110,7 @@ def run():
         global_val_loss /= len(val_loader)
         local_val_losses = [loss/len(val_loader) for loss in local_val_losses]
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_val_losses, set='train')
+        show_local_losses(local_val_losses, set='val')
         show_global_loss(global_val_loss, set='val')
 
 
