@@ -1,6 +1,7 @@
 import json
 import os
 import torch
+from torch import optim
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
@@ -40,7 +41,7 @@ def run():
 
     model = ClassificationModel(**params)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     criterion = MaskedBCELoss()  # Usando MaskedBCELoss
 
     if torch.cuda.is_available():
@@ -99,7 +100,6 @@ def run():
                 if torch.cuda.is_available():
                     inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
                 outputs = model(inputs)
-
                 for index, (output, target) in enumerate(zip(outputs, targets)):
                     loss = criterion(output, target)
                     local_val_losses[index] += loss
