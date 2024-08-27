@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
-from hmc.model.losses import MaskedBCELoss, show_global_loss, show_local_losses
+from hmc.model.losses import MaskedBCELoss, WeightedMaskedBCELoss, hierarchical_loss, show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
 
@@ -42,11 +42,6 @@ def run():
     model = ClassificationModel(**params)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    criterion = MaskedBCELoss()  # Usando MaskedBCELoss
-
-    if torch.cuda.is_available():
-        model = model.cuda()
-        criterion = criterion.cuda()
 
     torch_path = os.path.join(args.input_path, 'torch')
     metadata['train_torch_path'] = os.path.join(torch_path, 'train')
@@ -66,52 +61,91 @@ def run():
     best_val_loss = float('inf')
     patience_counter = 0
 
-    for epoch in range(1, args.epochs+1):
+    # Definir pesos para cada nível hierárquico
+    level_weights = [1.0, 0.8, 0.6, 0.4, 0.2]  # Ajuste conforme necessário
+
+    # Modificar o critério para incluir os pesos
+    criterion = WeightedMaskedBCELoss(level_weights)
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+        criterion = criterion.cuda()
+
+    # ... (resto do código permanece o mesmo até o loop de treinamento)
+
+    for epoch in range(1, args.epochs + 1):
         model.train()
         global_train_loss = 0.0
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
+        hierarchical_train_loss = 0.0
 
         for inputs, targets in train_loader:
             optimizer.zero_grad()
             if torch.cuda.is_available():
                 inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
             outputs = model(inputs)
+
+            # Calcular loss hierárquica
+            h_loss = hierarchical_loss(outputs, targets, level_weights)
+            hierarchical_train_loss += h_loss.item()
+
+            # Calcular losses locais e global
             for index, (output, target) in enumerate(zip(outputs, targets)):
-                loss = criterion(output, target)
-                local_train_losses[index] = loss.detach()
-                loss.backward()
+                loss = criterion(output, target, index)
+                local_train_losses[index] += loss.item()
+                global_train_loss += loss.item() * level_weights[index]
 
+            # Backpropagation usando a loss hierárquica
+            h_loss.backward()
             optimizer.step()
-            global_train_loss += sum(loss.detach() for loss in local_train_losses) / len(local_train_losses)
 
-        global_train_loss /= len(train_loader)
-        local_train_losses = [loss.detach() /len(train_loader) for loss in local_train_losses]
+        # Normalizar as losses
+        num_batches = len(train_loader)
+        hierarchical_train_loss /= num_batches
+        global_train_loss /= num_batches
+        local_train_losses = [loss / num_batches for loss in local_train_losses]
+
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='train')
         show_global_loss(global_train_loss, set='train')
+        print(f'Hierarchical Train Loss: {hierarchical_train_loss:.4f}')
 
+        # Validação
         model.eval()
         global_val_loss = 0.0
         local_val_losses = [0.0 for _ in range(metadata['max_depth'])]
+        hierarchical_val_loss = 0.0
+
         with torch.no_grad():
             for inputs, targets in val_loader:
                 if torch.cuda.is_available():
                     inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
                 outputs = model(inputs)
-                for index, (output, target) in enumerate(zip(outputs, targets)):
-                    loss = criterion(output, target)
-                    local_val_losses[index] += loss.detach()
-            global_val_loss += sum(loss.detach() for loss in local_val_losses) / len(local_val_losses)
 
-        global_val_loss /= len(val_loader)
-        local_val_losses = [loss.detach() /len(val_loader) for loss in local_val_losses]
+                # Calcular loss hierárquica
+                h_loss = hierarchical_loss(outputs, targets, level_weights)
+                hierarchical_val_loss += h_loss.item()
+
+                # Calcular losses locais e global
+                for index, (output, target) in enumerate(zip(outputs, targets)):
+                    loss = criterion(output, target, index)
+                    local_val_losses[index] += loss.item()
+                    global_val_loss += loss.item() * level_weights[index]
+
+        # Normalizar as losses
+        num_val_batches = len(val_loader)
+        hierarchical_val_loss /= num_val_batches
+        global_val_loss /= num_val_batches
+        local_val_losses = [loss / num_val_batches for loss in local_val_losses]
+
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_val_losses, set='val')
         show_global_loss(global_val_loss, set='val')
+        print(f'Hierarchical Val Loss: {hierarchical_val_loss:.4f}')
 
-
-        if global_val_loss < best_val_loss:
-            best_val_loss = global_val_loss
+        # Early stopping baseado na loss hierárquica
+        if hierarchical_val_loss < best_val_loss:
+            best_val_loss = hierarchical_val_loss
             patience_counter = 0
             torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
         else:
@@ -119,5 +153,6 @@ def run():
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
                 break
+
 
 
