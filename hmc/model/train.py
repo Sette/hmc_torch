@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
-from hmc.model.losses import MaskedBCELoss, WeightedMaskedBCELoss, hierarchical_loss, show_global_loss, show_local_losses
+from hmc.model.losses import MaskedBCELoss, create_hierarchy_matrix, WeightedMaskedBCELoss, hierarchical_loss, show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
 
@@ -42,6 +42,9 @@ def run():
     model = ClassificationModel(**params)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+
+    levels_size = metadata['levels_size']
+    hierarchy_matrix = create_hierarchy_matrix(levels_size)
 
     torch_path = os.path.join(args.input_path, 'torch')
     metadata['train_torch_path'] = os.path.join(torch_path, 'train')
@@ -86,7 +89,7 @@ def run():
             outputs = model(inputs)
 
             # Calcular loss hierárquica
-            h_loss = hierarchical_loss(outputs, targets, level_weights)
+            h_loss = hierarchical_loss(outputs, targets, level_weights, hierarchy_matrix)
             hierarchical_train_loss += h_loss.item()
 
             # Calcular losses locais e global
@@ -123,7 +126,7 @@ def run():
                 outputs = model(inputs)
 
                 # Calcular loss hierárquica
-                h_loss = hierarchical_loss(outputs, targets, level_weights)
+                h_loss = hierarchical_loss(outputs, targets, level_weights, hierarchy_matrix)
                 hierarchical_val_loss += h_loss.item()
 
                 # Calcular losses locais e global
