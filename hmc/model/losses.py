@@ -26,7 +26,14 @@ def hierarchical_loss(outputs, targets, level_weights):
     for i in range(len(outputs) - 1):
         parent = torch.sigmoid(outputs[i])
         child = torch.sigmoid(outputs[i + 1])
-        inconsistency = torch.max(child - parent, torch.zeros_like(parent))
+
+        # Mapear as classes filhas para as classes pai
+        child_to_parent = torch.zeros_like(parent)
+        for j in range(child.size(1)):
+            parent_idx = j // 2  # Assumindo que cada classe pai tem duas classes filhas
+            child_to_parent[:, parent_idx] = torch.max(child_to_parent[:, parent_idx], child[:, j])
+
+        inconsistency = torch.max(child_to_parent - parent, torch.zeros_like(parent))
         h_loss += torch.mean(inconsistency) * level_weights[i]
 
     return h_loss
