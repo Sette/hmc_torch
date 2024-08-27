@@ -78,13 +78,11 @@ def run():
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
                 loss = criterion(output, target)
-                loss.backward(retain_graph=True)
+                loss.backward()
                 optimizer.step()
                 local_train_losses[index] += loss
 
             global_train_loss = sum(local_train_losses)
-            global_train_loss.backward(retain_graph=True)
-            optimizer.step()
 
         running_global_train_loss = global_train_loss.item() / len(train_loader)
         running_local_train_losses = [loss.item() / len(train_loader) for loss in local_train_losses]
