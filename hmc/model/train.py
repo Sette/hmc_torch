@@ -79,9 +79,9 @@ def run():
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
                 loss = criterion(output, target)
+                local_train_losses[index] += loss
                 loss.backward()
                 optimizer.step()
-                local_train_losses[index] += loss
 
             global_train_loss = sum(local_train_losses)
 
