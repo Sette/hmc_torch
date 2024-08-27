@@ -83,7 +83,7 @@ def run():
                 optimizer.step()
                 local_train_losses[index] += loss.item()
 
-            global_train_loss = sum(local_train_losses)
+            global_train_loss = sum(local_train_losses) / metadata['max_depth']
 
         global_train_loss /= len(train_loader)
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
@@ -104,7 +104,7 @@ def run():
                     loss = criterion(output, target)
                     local_val_losses[index] += loss.item()
 
-                global_val_loss += sum(local_val_losses)
+                global_val_loss += sum(local_val_losses) / metadata['max_depth']
 
         global_val_loss /= len(val_loader)
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
