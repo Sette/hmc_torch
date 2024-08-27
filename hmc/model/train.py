@@ -78,7 +78,7 @@ def run():
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
                 loss = criterion(output, target)
-                loss.backward()
+                loss.backward(retain_graph=True)
                 optimizer.step()
                 local_train_losses[index] += loss
 
