@@ -38,7 +38,8 @@ def hierarchical_loss(outputs, targets, level_weights, hierarchy_matrix):
         child = torch.sigmoid(outputs[i + 1])
 
         # Usar a matriz de hierarquia para mapear as classes filhas para as classes pai
-        child_to_parent = torch.matmul(child, hierarchy_matrix[i].to(child.device))
+        hierarchy = hierarchy_matrix[i].to(child.device)
+        child_to_parent = torch.matmul(child, hierarchy)
 
         inconsistency = torch.max(child_to_parent - parent, torch.zeros_like(parent))
         h_loss += torch.mean(inconsistency) * level_weights[i]
