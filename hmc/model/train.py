@@ -83,7 +83,7 @@ def run():
                 local_train_losses[index] += loss
 
             global_train_loss = sum(local_train_losses)
-            global_train_loss.backward()
+            global_train_loss.backward(retain_graph=True)
             optimizer.step()
 
         running_global_train_loss = global_train_loss.item() / len(train_loader)
