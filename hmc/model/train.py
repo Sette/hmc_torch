@@ -80,20 +80,18 @@ def run():
                 loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
-                local_train_losses[index] += loss.item()
+                local_train_losses[index] += loss
 
-            total_batch_loss = sum(local_train_losses)
-            total_batch_loss.backward()
+            global_train_loss = sum(local_train_losses)
+            global_train_loss.backward()
             optimizer.step()
 
-            global_train_loss += total_batch_loss.item()
-
-        global_train_loss_show = global_train_loss/len(train_loader)
-        local_train_losses_show = [loss / len(train_loader) for loss in local_train_losses]
+        running_global_train_loss = global_train_loss.item() / len(train_loader)
+        running_local_train_losses = [loss.item() / len(train_loader) for loss in local_train_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_train_losses_show, set='train')
-        show_global_loss(global_train_loss_show, set='train')
+        show_local_losses(running_local_train_losses, set='train')
+        show_global_loss(running_global_train_loss, set='train')
 
         model.eval()
         global_val_loss = 0.0
@@ -103,21 +101,19 @@ def run():
                 if torch.cuda.is_available():
                     inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
                 outputs = model(inputs)
-                batch_local_loss = []
 
                 for index, (output, target) in enumerate(zip(outputs, targets)):
                     loss = criterion(output, target)
-                    local_val_losses[index] += loss.item()
-                    batch_local_loss.append(loss)
+                    local_val_losses[index] += loss
 
-                global_val_loss += sum(batch_local_loss).item()
+                global_val_loss += sum(local_val_losses)
 
-        global_val_loss /= len(val_loader)
-        local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
+        running_global_val_loss = global_val_loss.item() / len(val_loader)
+        running_local_val_losses = [loss.item() / len(val_loader) for loss in local_val_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_val_losses, set='val')
-        show_global_loss(global_val_loss, set='val')
+        show_local_losses(running_local_val_losses, set='val')
+        show_global_loss(running_global_val_loss, set='val')
 
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss
