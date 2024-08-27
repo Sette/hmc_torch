@@ -90,8 +90,9 @@ def run():
 
         global_train_loss /= len(train_loader)
         local_train_losses = [loss/len(train_loader) for loss in local_train_losses]
+        print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='train')
-        show_global_loss(global_train_loss, epoch, set='train')
+        show_global_loss(global_train_loss, set='train')
 
         model.eval()
         global_val_loss = 0.0
@@ -108,8 +109,10 @@ def run():
 
         global_val_loss /= len(val_loader)
         local_val_losses = [loss/len(val_loader) for loss in local_val_losses]
+        print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_val_losses, set='train')
-        show_global_loss(global_val_loss, epoch, set='val')
+        show_global_loss(global_val_loss, set='val')
+
 
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss

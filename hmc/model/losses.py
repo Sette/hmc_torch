@@ -6,8 +6,8 @@ def show_local_losses(local_losses, set='train'):
     for level, local_loss in enumerate(local_losses):
         print(f'{set} Loss {local_loss:.4f} for level {level}')
 
-def show_global_loss(global_loss, epoch, set='train'):
-    print(f'Epoch {epoch}/{args.epochs}, Global {set} Loss: {global_loss:.4f}, Global {set} Loss: {global_loss:.4f}')
+def show_global_loss(global_loss, set='train'):
+    print(f'Global {set} Loss: {global_loss:.4f}, Global {set} Loss: {global_loss:.4f}')
 
 class MaskedBCELoss(nn.Module):
     def __init__(self):
