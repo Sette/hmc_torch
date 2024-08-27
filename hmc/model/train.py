@@ -1,16 +1,12 @@
 import json
 import os
 import torch
-import argparse
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
 from hmc.model.losses import MaskedBCELoss, show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
-
-
 
 
 def run():
@@ -89,7 +85,7 @@ def run():
             global_train_loss += sum(loss.detach() for loss in local_train_losses) / len(local_train_losses)
 
         global_train_loss /= len(train_loader)
-        local_train_losses = [loss/len(train_loader) for loss in local_train_losses]
+        local_train_losses = [loss.detach() /len(train_loader) for loss in local_train_losses]
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='train')
         show_global_loss(global_train_loss, set='train')
@@ -108,7 +104,7 @@ def run():
             global_val_loss += sum(loss.detach() for loss in local_val_losses) / len(local_val_losses)
 
         global_val_loss /= len(val_loader)
-        local_val_losses = [loss/len(val_loader) for loss in local_val_losses]
+        local_val_losses = [loss.detach() /len(val_loader) for loss in local_val_losses]
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_val_losses, set='val')
         show_global_loss(global_val_loss, set='val')
