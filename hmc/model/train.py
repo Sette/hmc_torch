@@ -79,18 +79,18 @@ def run():
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
                 loss = criterion(output, target)
-                local_train_losses[index] += loss
                 loss.backward()
                 optimizer.step()
+                local_train_losses[index] += loss.item()
 
             global_train_loss = sum(local_train_losses)
 
-        running_global_train_loss = global_train_loss.item() / len(train_loader)
-        running_local_train_losses = [loss.item() / len(train_loader) for loss in local_train_losses]
+        global_train_loss /= len(train_loader)
+        local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(running_local_train_losses, set='train')
-        show_global_loss(running_global_train_loss, set='train')
+        show_local_losses(local_train_losses, set='train')
+        show_global_loss(global_train_loss, set='train')
 
         model.eval()
         global_val_loss = 0.0
@@ -102,16 +102,16 @@ def run():
                 outputs = model(inputs)
                 for index, (output, target) in enumerate(zip(outputs, targets)):
                     loss = criterion(output, target)
-                    local_val_losses[index] += loss
+                    local_val_losses[index] += loss.item()
 
                 global_val_loss += sum(local_val_losses)
 
-        running_global_val_loss = global_val_loss.item() / len(val_loader)
-        running_local_val_losses = [loss.item() / len(val_loader) for loss in local_val_losses]
+        global_val_loss /= len(val_loader)
+        local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(running_local_val_losses, set='val')
-        show_global_loss(running_global_val_loss, set='val')
+        show_local_losses(local_val_losses, set='val')
+        show_global_loss(global_val_loss, set='val')
 
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss
