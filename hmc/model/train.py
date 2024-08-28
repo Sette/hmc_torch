@@ -116,7 +116,7 @@ def run():
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss
             patience_counter = 0
-            torch.save(model.state_dict(), os.path.join(model_path))
+            torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
         else:
             patience_counter += 1
             if patience_counter >= early_stopping_patience:
