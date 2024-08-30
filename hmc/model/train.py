@@ -42,7 +42,8 @@ def run():
     model = ClassificationModel(**params)
 
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    criterion = MaskedBCELoss()  # Usando MaskedBCELoss
+    #criterion = MaskedBCELoss()  # Usando MaskedBCELoss
+    criterion = nn.BCELoss(reduction='none')
 
     if torch.cuda.is_available():
         model = model.cuda()
