@@ -1,12 +1,13 @@
 # %%
 import os
 import pandas as pd
+import sys
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
 from hmc.model.train import run
 
 # %%
-base_path = "/mnt/disks/data/fma/trains"
+base_path = "/home/bruno/storage/data/fma/trains"
 id = "hierarchical_tworoots"
 
 
@@ -27,30 +28,23 @@ print(f"Job ID: {job_id}")
 model_path = os.path.join(hmc_path, job_id)
 create_dir(model_path)
 
-
-args = pd.Series({
-    "batch_size":64,
-    "epochs":15,
-    "dropout":0.1,
-    'patience':5,
-    'shuffle':True,
-    'max_queue_size':64,
-    "labels_path": labels_path,
-    "metadata_path": metadata_path,
-    "model_path": model_path,
-    "train_path": os.path.join(torch_path,'train'),
-    "test_path": os.path.join(torch_path,'test'),
-    "val_path": os.path.join(torch_path,'val')
-})
+sys.argv = [
+'script.py',
+'--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
+'--output_path', '/home/bruno/storage/data/fma/trains',
+'--batch_size', '128',
+'--epochs', '20',
+'--dropout', '0.3', '0.3', '0.3', '0.3',
+'--patience', '5'
+]
 
 
 # %%
-
+# Salvar os argumentos atuais
 time_start = dt.utcnow()
 print("[{}] Experiment started at {}".format(id, time_start.strftime("%H:%M:%S")))
 print(".......................................")
-print(args)
-run(args)
+run()
 time_end = dt.utcnow()
 time_elapsed = time_end - time_start
 print(".......................................")
