@@ -2,6 +2,7 @@
 import os
 import pandas as pd
 import sys
+from datetime import UTC
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
 from hmc.model.train import run
@@ -41,11 +42,11 @@ sys.argv = [
 
 # %%
 # Salvar os argumentos atuais
-time_start = dt.utcnow()
+time_start = dt.now(UTC)
 print("[{}] Experiment started at {}".format(id, time_start.strftime("%H:%M:%S")))
 print(".......................................")
 run()
-time_end = dt.utcnow()
+time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
 print("[{}] Experiment finished at {} / elapsed time {}s".format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
