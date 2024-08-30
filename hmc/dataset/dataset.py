@@ -18,7 +18,7 @@ class HMCDataset(Dataset):
         data = []
         for file in os.listdir(self.files):
             file_path = os.path.join(self.files, file)
-            data.extend(torch.load(file_path))
+            data.extend(torch.load(file_path, weights_only=False))
         return data
 
     def __len__(self):
