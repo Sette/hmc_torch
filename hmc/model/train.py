@@ -2,6 +2,7 @@ import json
 import os
 import torch
 from torch import optim
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
@@ -43,11 +44,11 @@ def run():
 
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     #criterion = MaskedBCELoss()  # Usando MaskedBCELoss
-    criterion = nn.BCELoss(reduction='none')
+    criterion = nn.BCELoss()
 
     if torch.cuda.is_available():
-        model = model.cuda()
-        criterion = criterion.cuda()
+        model = model.to('cuda')
+        criterion = criterion.to('cuda')
 
     torch_path = os.path.join(args.input_path, 'torch')
     metadata['train_torch_path'] = os.path.join(torch_path, 'train')
