@@ -51,4 +51,21 @@ class ClassificationModel(nn.Module):
                 current_input = torch.cat((current_output.detach(), x), dim=1)
             current_output = level(current_input)
             outputs.append(current_output)
+        assert isinstance(outputs, object)
         return outputs
+
+    def predict(self, testset_path):
+        ds_test = HMCDataset(testset_path, labels['levels_size'])
+        test_loader = DataLoader(ds_test, batch_size=64, shuffle=False)
+        predictions = []
+
+        for inputs, targets in test_loader:
+            actuals.append([target.numpy() for target in targets])
+            if torch.cuda.is_available():
+                inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
+            outputs = [output.cpu().detach().numpy() for output in model(inputs)]
+            # Armazena as predições e os valores reais
+            predictions.append(outputs)
+
+        predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
+        return predictions
