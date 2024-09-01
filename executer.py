@@ -32,7 +32,7 @@ create_dir(model_path)
 sys.argv = [
 'script.py',
 '--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
-'--output_path', '/home/bruno/storage/data/fma/trains',
+'--output_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
 '--batch_size', '128',
 '--epochs', '20',
 '--dropout', '0.3', '0.3', '0.3', '0.3',

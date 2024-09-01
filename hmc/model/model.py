@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
+from torch.utils.data import DataLoader
+from hmc.dataset import HMCDataset
 
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
@@ -46,6 +49,7 @@ class ClassificationModel(nn.Module):
     def forward(self, x):
         outputs = []
         current_input = x
+        current_output = current_input
         for i, level in enumerate(self.levels):
             if i != 0:
                 current_input = torch.cat((current_output.detach(), x), dim=1)
@@ -54,18 +58,18 @@ class ClassificationModel(nn.Module):
         assert isinstance(outputs, object)
         return outputs
 
-    def predict(self, testset_path):
-        ds_test = HMCDataset(testset_path, labels['levels_size'])
-        test_loader = DataLoader(ds_test, batch_size=64, shuffle=False)
+    def predict(self, testset_path, batch_size=64):
+        self.eval()  # Coloca o modelo em modo de avaliação
+        ds_test = HMCDataset(testset_path, self.levels_size)
+        test_loader = DataLoader(ds_test, batch_size=batch_size, shuffle=False)
         predictions = []
 
-        for inputs, targets in test_loader:
-            actuals.append([target.numpy() for target in targets])
-            if torch.cuda.is_available():
-                inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
-            outputs = [output.cpu().detach().numpy() for output in model(inputs)]
-            # Armazena as predições e os valores reais
-            predictions.append(outputs)
+        with torch.no_grad():  # Desativa o cálculo de gradientes
+            for inputs, _ in test_loader:
+                if torch.cuda.is_available():
+                    inputs = inputs.cuda()
+                outputs = [output.cpu().detach().numpy() for output in self(inputs)]
+                predictions.append(outputs)
 
         predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
         return predictions
