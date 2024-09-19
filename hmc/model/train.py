@@ -1,12 +1,11 @@
 import json
 import os
 import torch
-from torch import optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from hmc.model import ClassificationModel
 from hmc.dataset import HMCDataset
-from hmc.model.losses import MaskedBCELoss, show_global_loss, show_local_losses
+from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
 
@@ -43,7 +42,7 @@ def run():
     model = ClassificationModel(**params)
 
     optimizers = [
-        optim.SGD(level.parameters(), lr=0.0001, momentum=0.9) for level in model.levels
+        torch.optim.SGD(level.parameters(), lr=0.001, momentum=0.9) for level in model.levels
     ]
 
     criterion = nn.BCELoss()
@@ -74,17 +73,16 @@ def run():
         model.train()
         global_train_loss = 0.0
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
-
         for inputs, targets in train_loader:
             if torch.cuda.is_available():
                 inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
             outputs = model(inputs)
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
-                optimizers[index].zero_grad()  # Zerar o gradiente para cada otimizador
+                optimizers[index].zero_grad()
                 loss = criterion(output, target)
                 loss.backward()
-                optimizers[index].step()  # Atualizar os pesos para o nível correspondente
+                optimizers[index].step()  
                 local_train_losses[index] += loss.item()
 
             global_train_loss = sum(local_train_losses) / metadata['max_depth']
