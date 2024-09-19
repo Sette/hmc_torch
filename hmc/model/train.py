@@ -42,7 +42,7 @@ def run():
 
     model = ClassificationModel(**params)
 
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
     #criterion = MaskedBCELoss()  # Usando MaskedBCELoss
     criterion = nn.BCELoss()
 
@@ -61,7 +61,7 @@ def run():
     train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(ds_validation, batch_size=args.batch_size, shuffle=False)
 
-    model_path = os.path.join(args.output_path, job_id)
+    model_path = os.path.join(args.output_path, 'jobs' ,job_id)
     create_dir(model_path)
 
     early_stopping_patience = args.patience
@@ -91,8 +91,8 @@ def run():
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_train_losses, set='train')
-        show_global_loss(global_train_loss, set='train')
+        show_local_losses(local_train_losses, set='Train')
+        show_global_loss(global_train_loss, set='Train')
 
         model.eval()
         global_val_loss = 0.0
@@ -112,8 +112,8 @@ def run():
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
 
         print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_val_losses, set='val')
-        show_global_loss(global_val_loss, set='val')
+        show_local_losses(local_val_losses, set='Val')
+        show_global_loss(global_val_loss, set='Val')
 
         if global_val_loss < best_val_loss:
             best_val_loss = global_val_loss

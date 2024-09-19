@@ -2,12 +2,15 @@
 import torch
 import torch.nn as nn
 
-def show_local_losses(local_losses, set='train'):
+def show_local_losses(local_losses, set='Train'):
+    formated_string = ''
     for level, local_loss in enumerate(local_losses):
-        print(f'{set} Loss {local_loss:.3f} for level {level}')
+        formated_string += f'{set} Loss {local_loss:.3f} for level {level} // '
+        
+    print(formated_string)
 
-def show_global_loss(global_loss, set='train'):
-    print(f'Global {set} Loss: {global_loss:.3f}')
+def show_global_loss(global_loss, set='Train'):
+    print(f'Global average loss {set} Loss: {global_loss:.3f}')
 
 class MaskedBCELoss(nn.Module):
     def __init__(self):

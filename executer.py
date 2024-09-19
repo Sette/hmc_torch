@@ -13,7 +13,7 @@ id = "hierarchical_tworoots"
 
 
 # %%
-train_path = os.path.join(base_path,id)
+train_path = os.path.join(base_path, id)
 torch_path = os.path.join(train_path,'torch')
 metadata_path = os.path.join(train_path,"metadata.json")
 labels_path = os.path.join(train_path,"labels.json")

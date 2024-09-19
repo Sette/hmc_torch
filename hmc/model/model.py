@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
+from hmc.model.metrics import custom_range
 
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
@@ -16,6 +18,15 @@ class ExpandOutputClassification(nn.Module):
         x = self.relu(x)
         return x
 
+class OutputNormalization(nn.Module):
+    def forward(self, x):
+        # Obtém os índices dos maiores valores ao longo da dimensão 1
+        indices = torch.argmax(x, dim=1)
+        # Converte esses índices para one-hot encoding
+        return F.one_hot(indices, num_classes=x.size(1)).to(dtype=x.dtype)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
 class BuildClassification(nn.Module):
     def __init__(self, size, dropout, input_shape=1024):
@@ -39,8 +50,11 @@ class ClassificationModel(nn.Module):
     def __init__(self, levels_size, sequence_size=1280, dropouts=[]):
         super(ClassificationModel, self).__init__()
         self.sequence_size = sequence_size
+        self.levels_size = levels_size
+        self.thesholds = custom_range(len(levels_size))
         self.dropouts = dropouts
         self.levels = nn.ModuleList()
+        self.output_normalization = OutputNormalization()
         next_size = 0
         for size, dropout in zip(levels_size, dropouts):
             self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
@@ -55,6 +69,7 @@ class ClassificationModel(nn.Module):
                 current_input = torch.cat((current_output.detach(), x), dim=1)
             current_output = level(current_input)
             outputs.append(current_output)
+            current_output = self.output_normalization(current_output)
         assert isinstance(outputs, object)
         return outputs
 
@@ -68,8 +83,8 @@ class ClassificationModel(nn.Module):
             for inputs, _ in test_loader:
                 if torch.cuda.is_available():
                     inputs = inputs.cuda()
-                outputs = [output.cpu().detach().numpy() for output in self(inputs)]
-                predictions.append(outputs)
+                binary_outputs = [(output >= 0.6).cpu().detach().numpy().astype(int) for output in self(inputs)]
+                predictions.append(binary_outputs)
 
         predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
         return predictions
