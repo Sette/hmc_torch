@@ -5,7 +5,7 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
-from hmc.model.metrics import custom_range
+from hmc.model.metrics import custom_thesholds, custom_droputs
 
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
@@ -51,8 +51,11 @@ class ClassificationModel(nn.Module):
         super(ClassificationModel, self).__init__()
         self.sequence_size = sequence_size
         self.levels_size = levels_size
-        self.thesholds = custom_range(len(levels_size))
-        self.dropouts = dropouts
+        self.thesholds = custom_thesholds(len(levels_size))
+        if not dropouts:
+            self.dropouts = custom_droputs(len(levels_size))
+        else:
+            self.dropouts = dropouts
         self.levels = nn.ModuleList()
         self.output_normalization = OutputNormalization()
         next_size = 0
