@@ -42,8 +42,10 @@ def run():
 
     model = ClassificationModel(**params)
 
-    optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
-    #criterion = MaskedBCELoss()  # Usando MaskedBCELoss
+    optimizers = [
+        optim.SGD(level.parameters(), lr=0.0001, momentum=0.9) for level in model.levels
+    ]
+
     criterion = nn.BCELoss()
 
     if torch.cuda.is_available():
@@ -74,15 +76,15 @@ def run():
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
 
         for inputs, targets in train_loader:
-            optimizer.zero_grad()
             if torch.cuda.is_available():
                 inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
             outputs = model(inputs)
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
+                optimizers[index].zero_grad()  # Zerar o gradiente para cada otimizador
                 loss = criterion(output, target)
                 loss.backward()
-                optimizer.step()
+                optimizers[index].step()  # Atualizar os pesos para o nível correspondente
                 local_train_losses[index] += loss.item()
 
             global_train_loss = sum(local_train_losses) / metadata['max_depth']
