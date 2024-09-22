@@ -86,7 +86,7 @@ class ClassificationModel(nn.Module):
             for inputs, _ in test_loader:
                 if torch.cuda.is_available():
                     inputs = inputs.cuda()
-                binary_outputs = [(output >= 0.6).cpu().detach().numpy().astype(int) for output in self(inputs)]
+                binary_outputs = [(output >= 0.5).cpu().detach().numpy().astype(int) for output in self(inputs)]
                 predictions.append(binary_outputs)
 
         predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
