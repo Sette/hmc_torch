@@ -106,10 +106,11 @@ def run():
                     loss = criterion(output, target)
                     local_val_losses[index] += loss.item()
 
-                global_val_loss += sum(local_val_losses) / metadata['max_depth']
+                #global_val_loss += sum(local_val_losses) / metadata['max_depth']
 
-        global_val_loss /= len(val_loader)
+        #global_val_loss /= len(val_loader)
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
+        global_val_loss = sum(local_val_losses) / metadata['max_depth']
 
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_val_losses, set='Val')
