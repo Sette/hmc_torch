@@ -85,10 +85,11 @@ def run():
                 optimizers[index].step()  
                 local_train_losses[index] += loss.item()
 
-            global_train_loss = sum(local_train_losses) / metadata['max_depth']
+            #global_train_loss = sum(local_train_losses) / metadata['max_depth']
 
-        global_train_loss /= len(train_loader)
+        #global_train_loss /= len(train_loader)
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
+        global_train_loss = sum(local_train_losses) / metadata['max_depth']
 
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='Train')
