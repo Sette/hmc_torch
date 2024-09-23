@@ -2,6 +2,7 @@ import os
 import torch
 from torch.utils.data import Dataset
 
+import pandas as pd
 import numpy as np
 
 BUFFER_SIZE = 10
@@ -11,9 +12,18 @@ class HMCDataset(Dataset):
         self.files = files
         self.levels_size = levels_size
         self.data = self.load_data()
+        self.df = self.to_dataframe()
+        
+    def to_dataframe(self):
+        records = []
+        for example in self.data:
+            record = {'features': example['features']}
+            for level in range(1, len(self.levels_size) + 1):
+                record[f'level{level}'] = example[f'level{level}']
+            records.append(record)
+        return pd.DataFrame(records)
 
     def load_data(self):
-        # Carregar dados a partir dos arquivos e retornar uma lista de exemplos
         data = []
         for file in os.listdir(self.files):
             file_path = os.path.join(self.files, file)
