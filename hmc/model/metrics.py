@@ -2,16 +2,15 @@ from sklearn.metrics import classification_report, f1_score
 
 import pandas as pd
 
-def custom_thesholds(n):
+def custom_thresholds(n):
     start = 0.5
     step = -0.07
     return [start + i * step for i in range(n)]
 
-def custom_droputs(n):
+def custom_dropouts(n):
     start = 0.5
     step = -0.1
     return [start + i * step for i in range(n)]
-
 
 
 
