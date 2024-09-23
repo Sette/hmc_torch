@@ -5,7 +5,7 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
-from hmc.model.metrics import custom_thesholds, custom_droputs
+from hmc.model.metrics import custom_thresholds, custom_dropouts
 
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
@@ -20,9 +20,7 @@ class ExpandOutputClassification(nn.Module):
 
 class OutputNormalization(nn.Module):
     def forward(self, x):
-        # Obtém os índices dos maiores valores ao longo da dimensão 1
         indices = torch.argmax(x, dim=1)
-        # Converte esses índices para one-hot encoding
         return F.one_hot(indices, num_classes=x.size(1)).to(dtype=x.dtype)
 
     def compute_output_shape(self, input_shape):
@@ -51,9 +49,9 @@ class ClassificationModel(nn.Module):
         super(ClassificationModel, self).__init__()
         self.sequence_size = sequence_size
         self.levels_size = levels_size
-        self.thesholds = custom_thesholds(len(levels_size))
+        self.thresholds = custom_thresholds(len(levels_size))
         if not dropouts:
-            self.dropouts = custom_droputs(len(levels_size))
+            self.dropouts = custom_dropouts(len(levels_size))
         else:
             self.dropouts = dropouts
         self.levels = nn.ModuleList()
@@ -77,16 +75,15 @@ class ClassificationModel(nn.Module):
         return outputs
 
     def predict(self, testset_path, batch_size=64):
-        self.eval()  # Coloca o modelo em modo de avaliação
+        self.eval()  
         ds_test = HMCDataset(testset_path, self.levels_size)
         test_loader = DataLoader(ds_test, batch_size=batch_size, shuffle=False)
         predictions = []
-
-        with torch.no_grad():  # Desativa o cálculo de gradientes
+        with torch.no_grad():
             for inputs, _ in test_loader:
                 if torch.cuda.is_available():
                     inputs = inputs.cuda()
-                binary_outputs = [(output >= 0.5).cpu().detach().numpy().astype(int) for output in self(inputs)]
+                binary_outputs = [(output >= threshold).cpu().detach().numpy().astype(int) for output, threshold in zip(self(inputs), self.thresholds)]
                 predictions.append(binary_outputs)
 
         predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
