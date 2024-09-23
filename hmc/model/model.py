@@ -45,14 +45,14 @@ class BuildClassification(nn.Module):
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(input_shape // 2, size)
-        self.softmax = nn.Softmax()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu1(x)
         x = self.dropout1(x)
         x = self.fc2(x)
-        x = self.softmax(x)
+        x = self.sigmoid(x)
         return x
 
 
