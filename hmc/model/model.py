@@ -7,6 +7,23 @@ from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
 from hmc.model.metrics import custom_thresholds, custom_dropouts
 
+def pad_nested_lists(input_list):
+    # Determinar o número de níveis
+    num_levels = len(input_list[0])
+
+    max_sizes = [max(len(example[level]) for example in input_list) for level in range(num_levels)]
+
+    output_list = []
+    for example in input_list:
+        padded_example = []
+        for level, max_size in zip(example, max_sizes):
+            # Preencher com zeros se o tamanho for menor que o máximo
+            padded_level = np.pad(level, (0, max_size - len(level)), mode='constant')
+            padded_example.append(padded_level)
+        output_list.append(padded_example)
+
+    return output_list
+
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
         super(ExpandOutputClassification, self).__init__()
@@ -86,6 +103,7 @@ class ClassificationModel(nn.Module):
                     inputs = inputs.cuda()
                 binary_outputs = [(output >= threshold).cpu().detach().numpy().astype(int) for output, threshold in zip(self(inputs), self.thresholds)]
                 predictions.append(binary_outputs)
-
-        df_test['predictions'] = [np.vstack(level_targets) for level_targets in zip(*predictions)]
+        output_list = [np.vstack(level_targets) for level_targets in zip(*predictions)]
+        output_list = pad_nested_lists(output_list)
+        df_test['predictions'] = output_list
         return df_test
