@@ -12,7 +12,6 @@ class HMCDataset(Dataset):
         self.files = files
         self.levels_size = levels_size
         self.data = self.load_data()
-        self.df = self.to_dataframe()
         
     def to_dataframe(self):
         records = []

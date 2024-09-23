@@ -77,6 +77,7 @@ class ClassificationModel(nn.Module):
     def predict(self, testset_path, batch_size=64):
         self.eval()  
         ds_test = HMCDataset(testset_path, self.levels_size)
+        df_test = ds_test.to_dataframe()
         test_loader = DataLoader(ds_test, batch_size=batch_size, shuffle=False)
         predictions = []
         with torch.no_grad():
@@ -86,5 +87,5 @@ class ClassificationModel(nn.Module):
                 binary_outputs = [(output >= threshold).cpu().detach().numpy().astype(int) for output, threshold in zip(self(inputs), self.thresholds)]
                 predictions.append(binary_outputs)
 
-        predictions = [np.vstack(level_targets) for level_targets in zip(*predictions)]
-        return predictions
+        df_test['predictions'] = [np.vstack(level_targets) for level_targets in zip(*predictions)]
+        return df_test
