@@ -21,7 +21,7 @@ def run():
     args = parser.parse_args()
 
     dropouts = [float(rate) for rate in args.dropout]
-    threshold = [float(threshold) for threshold in args.threshold]
+    thresholds = [float(threshold) for threshold in args.thresholds]
 
     metadata_path = os.path.join(args.input_path, 'metadata.json')
     labels_path = os.path.join(args.input_path, 'labels.json')
@@ -36,7 +36,7 @@ def run():
         'levels_size': labels['levels_size'],
         'sequence_size': metadata['sequence_size'],
         'dropouts': dropouts,
-        'threshold': threshold
+        'thresholds': thresholds
     }
 
     assert len(args.dropout) == metadata['max_depth']
@@ -127,4 +127,6 @@ def run():
             patience_counter += 1
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
+                predict = model.predict(testset_path=metadata['test_torch_path'],batch_size=64)
+                return predict
                 break

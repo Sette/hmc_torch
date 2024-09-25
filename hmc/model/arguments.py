@@ -7,5 +7,6 @@ def get_parser():
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
     parser.add_argument('--epochs', type=int, default=15, help='Number of epochs for training.')
     parser.add_argument('--dropout', type=str, nargs='+', default=['0.3', '0.5', '0.6', '0.7'], help='Dropout rate by level.')
+    parser.add_argument('--thresholds', type=str, nargs='+', default=['0.3', '0.5', '0.6', '0.7'], help='Threshold rate by level.')
     parser.add_argument('--patience', type=int, default=3, help='Patience for early stopping.')
     return parser
