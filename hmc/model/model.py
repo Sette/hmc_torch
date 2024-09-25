@@ -29,7 +29,6 @@ class ExpandOutputClassification(nn.Module):
         x = self.dense(x)
         x = self.relu(x)
         return x
-
 class OutputNormalization(nn.Module):
     def forward(self, x):
         indices = torch.argmax(x, dim=1)
