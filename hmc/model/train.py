@@ -42,7 +42,7 @@ def run():
     model = ClassificationModel(**params)
 
     optimizers = [
-        torch.optim.SGD(level.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5) for level in model.levels
+        torch.optim.SGD(level.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5) for level in model.levels
     ]
 
     criterion = nn.BCELoss()
