@@ -21,6 +21,7 @@ def run():
     args = parser.parse_args()
 
     dropouts = [float(rate) for rate in args.dropout]
+    threshold = [float(threshold) for threshold in args.threshold]
 
     metadata_path = os.path.join(args.input_path, 'metadata.json')
     labels_path = os.path.join(args.input_path, 'labels.json')
@@ -34,7 +35,8 @@ def run():
     params = {
         'levels_size': labels['levels_size'],
         'sequence_size': metadata['sequence_size'],
-        'dropouts': dropouts
+        'dropouts': dropouts,
+        'threshold': threshold
     }
 
     assert len(args.dropout) == metadata['max_depth']
