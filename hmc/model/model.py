@@ -56,11 +56,14 @@ class BuildClassification(nn.Module):
 
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropouts=[]):
+    def __init__(self, levels_size, sequence_size=1280, dropouts=[], thresholds=[]):
         super(ClassificationModel, self).__init__()
         self.sequence_size = sequence_size
         self.levels_size = levels_size
-        self.thresholds = custom_thresholds(len(levels_size))
+        if not thresholds:
+            self.thresholds = custom_thresholds(len(levels_size))
+        else:
+            self.thresholds = thresholds
         if not dropouts:
             self.dropouts = custom_dropouts(len(levels_size))
         else:
