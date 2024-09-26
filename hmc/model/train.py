@@ -40,11 +40,12 @@ def run():
     }
 
     assert len(args.dropout) == metadata['max_depth']
+    assert len(args.lrs) == metadata['max_depth']
 
     model = ClassificationModel(**params)
 
     optimizers = [
-        torch.optim.SGD(level.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5) for level in model.levels
+        torch.optim.SGD(level.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5) for level, lr in zip(model.levels, args.lrs)
     ]
 
     criterion = nn.BCELoss()
@@ -64,7 +65,8 @@ def run():
     train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(ds_validation, batch_size=args.batch_size, shuffle=False)
 
-    model_path = os.path.join(args.output_path, 'jobs' ,job_id)
+    assert isinstance(args.output_path, str)
+    model_path: str = os.path.join(args.output_path, 'jobs' ,job_id)
     create_dir(model_path)
 
     early_stopping_patience = args.patience
@@ -73,7 +75,6 @@ def run():
 
     for epoch in range(1, args.epochs+1):
         model.train()
-        global_train_loss = 0.0
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
         for inputs, targets in train_loader:
             if torch.cuda.is_available():
@@ -87,9 +88,6 @@ def run():
                 optimizers[index].step()  
                 local_train_losses[index] += loss.item()
 
-            #global_train_loss = sum(local_train_losses) / metadata['max_depth']
-
-        #global_train_loss /= len(train_loader)
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
         global_train_loss = sum(local_train_losses) / metadata['max_depth']
 
@@ -98,7 +96,6 @@ def run():
         show_global_loss(global_train_loss, set='Train')
 
         model.eval()
-        global_val_loss = 0.0
         local_val_losses = [0.0 for _ in range(metadata['max_depth'])]
         with torch.no_grad():
             for inputs, targets in val_loader:
@@ -109,9 +106,6 @@ def run():
                     loss = criterion(output, target)
                     local_val_losses[index] += loss.item()
 
-                #global_val_loss += sum(local_val_losses) / metadata['max_depth']
-
-        #global_val_loss /= len(val_loader)
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
         global_val_loss = sum(local_val_losses) / metadata['max_depth']
 
@@ -129,4 +123,3 @@ def run():
                 print("Early stopping triggered")
                 predict = model.predict(testset_path=metadata['test_torch_path'],batch_size=64)
                 return predict
-                break

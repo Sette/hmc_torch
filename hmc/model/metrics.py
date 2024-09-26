@@ -10,14 +10,17 @@ import pandas as pd
 def custom_thresholds(n):
     start = 0.5
     step = 0
-    return [start -  i * step for i in range(n)]
+    return [start +  i * step for i in range(n)]
 
 def custom_dropouts(n):
     start = 0.5
     step = -0.1
     return [start + i * step for i in range(n)]
 
-
+def custom_lrs(n):
+    start = 0.0001
+    step = 0
+    return [start + i * step for i in range(n)]
 
 def create_report_metrics(y_pred, y_true, target_names):
     rerport = classification_report(

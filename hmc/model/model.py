@@ -5,11 +5,10 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
-from hmc.model.metrics import custom_thresholds, custom_dropouts
+from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs
 
 def transform_predictions(predictions):
     transformed = []
-    
     # Loop through each index to form examples with the first element from each level
     for i in range(len(predictions[0])):  # Iterate over the number of examples
         example = []
@@ -29,11 +28,14 @@ class ExpandOutputClassification(nn.Module):
         x = self.dense(x)
         x = self.relu(x)
         return x
+
+
 class OutputNormalization(nn.Module):
+    def __init__(self):
+        super().__init__()
     def forward(self, x):
         indices = torch.argmax(x, dim=1)
         return F.one_hot(indices, num_classes=x.size(1)).to(dtype=x.dtype)
-
     def compute_output_shape(self, input_shape):
         return input_shape
 
@@ -56,8 +58,8 @@ class BuildClassification(nn.Module):
 
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropouts=[], thresholds=[]):
-        super(ClassificationModel, self).__init__()
+    def __init__(self, levels_size, sequence_size=1280, dropouts=None, thresholds=None, lr=None):
+        super().__init__()
         self.sequence_size = sequence_size
         self.levels_size = levels_size
         if not thresholds:
@@ -68,6 +70,8 @@ class ClassificationModel(nn.Module):
             self.dropouts = custom_dropouts(len(levels_size))
         else:
             self.dropouts = dropouts
+        if not lr:
+            self.lrs = custom_lrs(len(levels_size))
         self.levels = nn.ModuleList()
         self.output_normalization = OutputNormalization()
         next_size = 0
@@ -98,7 +102,9 @@ class ClassificationModel(nn.Module):
             for inputs, _ in test_loader:
                 if torch.cuda.is_available():
                     inputs = inputs.cuda()
-                binary_outputs = [(output >= threshold).cpu().detach().numpy().astype(int) for output, threshold in zip(self(inputs), self.thresholds)]
+                binary_outputs = []
+                for output, threshold in zip(self(inputs), self.thresholds):
+                    binary_outputs.append((output >= threshold).cpu().detach().numpy().astype(int))
                 predictions.append(binary_outputs)
         output_list = [np.vstack(level_targets) for level_targets in zip(*predictions)]
         output_list = transform_predictions(output_list)
