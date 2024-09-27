@@ -22,6 +22,7 @@ def run():
 
     dropouts = [float(rate) for rate in args.dropout]
     thresholds = [float(threshold) for threshold in args.thresholds]
+    lrs = [float(threshold) for threshold in args.lrs]
 
     metadata_path = os.path.join(args.input_path, 'metadata.json')
     labels_path = os.path.join(args.input_path, 'labels.json')
@@ -45,7 +46,7 @@ def run():
     model = ClassificationModel(**params)
 
     optimizers = [
-        torch.optim.SGD(level.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5) for level, lr in zip(model.levels, args.lrs)
+        torch.optim.SGD(level.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5) for level, lr in zip(model.levels, lrs)
     ]
 
     criterion = nn.BCELoss()
