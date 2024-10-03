@@ -1,3 +1,5 @@
+import os.path
+
 from sklearn.metrics import classification_report, f1_score
 
 import pandas as pd
@@ -48,7 +50,7 @@ def create_reports(results, y_true, labels, max_depth):
 
     return reports, fscore
 
-def generete_md(binary_predictions, df_test, labels):
+def generete_md(binary_predictions, df_test, labels, path='.'):
     for idx, binary_label in enumerate(binary_predictions, start=1):
         level_name = f'level{idx}'
     
@@ -63,8 +65,10 @@ def generete_md(binary_predictions, df_test, labels):
 
         markdown = df_report.to_markdown()
 
+        file_path = os.path.join(path, f'report-{idx}.md')
+
         # Escrever o markdown em um arquivo
-        with open(f'report-tworoots-{idx}.md', 'w') as f:
+        with open(file_path, 'w') as f:
             f.write(markdown)
 
     
