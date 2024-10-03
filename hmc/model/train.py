@@ -8,6 +8,7 @@ from hmc.dataset import HMCDataset
 from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
+from hmc.model.metrics import generete_md
 
 def run():
     print("========================= PyTorch =========================")
@@ -123,4 +124,5 @@ def run():
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
                 predict = model.predict(testset_path=metadata['test_torch_path'],batch_size=64)
+                generete_md(predict.predictions, predict)
                 return predict
