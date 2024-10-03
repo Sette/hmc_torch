@@ -15,10 +15,11 @@ class HMCDataset(Dataset):
         
     def to_dataframe(self):
         records = []
+        labels = {}
         for example in self.data:
-            record = {'features': example['features']}
             for level in range(1, len(self.levels_size) + 1):
-                record[f'level{level}'] = example[f'level{level}']
+                labels.update({f'level{level}': example[f'level{level}']})
+            record = {'features': example['features'], 'labels': labels}
             records.append(record)
         return pd.DataFrame(records)
 
