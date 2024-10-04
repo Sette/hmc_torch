@@ -54,7 +54,7 @@ def generete_md(binary_predictions, df_test, labels, path='.'):
     for idx, binary_label in enumerate(binary_predictions, start=1):
         level_name = f'level{idx}'
     
-        y_test_bin =  df_test.labels.values().tolist()
+        y_test_bin =  df_test.labels.values.tolist()
 
         rerport = classification_report(y_test_bin, binary_label.tolist(), \
                                         target_names=list(labels[level_name].keys()),\
