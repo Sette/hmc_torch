@@ -59,7 +59,6 @@ def generete_md(binary_predictions, df_test, labels, path='.'):
         rerport = classification_report(y_test_bin, binary_label, \
                                         target_names=list(labels[level_name].keys()),\
                                         output_dict=True,  zero_division=0)
-
         # Converter o dicionário em DataFrame
         df_report = pd.DataFrame(rerport).transpose()
 
