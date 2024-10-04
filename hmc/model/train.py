@@ -120,7 +120,7 @@ def run():
             patience_counter = 0
             torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
             predict = model.predict(testset_path=metadata['test_torch_path'], batch_size=64)
-            generete_md(predict.predictions, predict, path=model_path)
+            generete_md(predict.predictions, predict, labels, path=model_path)
         else:
             patience_counter += 1
             if patience_counter >= early_stopping_patience:
