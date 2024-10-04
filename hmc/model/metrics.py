@@ -56,7 +56,7 @@ def generete_md(binary_predictions, df_test, labels, path='.'):
     
         y_test_bin =  df_test.labels.values.tolist()
 
-        rerport = classification_report(y_test_bin, binary_label.tolist(), \
+        rerport = classification_report(y_test_bin, binary_label, \
                                         target_names=list(labels[level_name].keys()),\
                                         output_dict=True,  zero_division=0)
 
