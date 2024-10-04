@@ -73,7 +73,7 @@ class ClassificationModel(nn.Module):
         if not lr:
             self.lrs = custom_lrs(len(levels_size))
         self.levels = nn.ModuleList()
-        self.output_normalization = OutputNormalization()
+        self.output_normalization = ExpandOutputClassification()
         next_size = 0
         for size, dropout in zip(levels_size, dropouts):
             self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
