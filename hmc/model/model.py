@@ -21,7 +21,8 @@ def transform_predictions(predictions):
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512):
         super(ExpandOutputClassification, self).__init__()
-        self.dense = nn.Linear(input_shape, input_shape)
+        output_shape = 512
+        self.dense = nn.Linear(input_shape, output_shape)
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -73,10 +74,11 @@ class ClassificationModel(nn.Module):
         if not lr:
             self.lrs = custom_lrs(len(levels_size))
         self.levels = nn.ModuleList()
-        self.output_normalization = ExpandOutputClassification()
+        self.output_normalization = []
         next_size = 0
         for size, dropout in zip(levels_size, dropouts):
             self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
+            self.output_normalization.append(ExpandOutputClassification(size))
             next_size = size
 
     def forward(self, x):
