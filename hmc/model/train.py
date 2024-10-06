@@ -80,7 +80,7 @@ def run():
         local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
         for inputs, targets in train_loader:
             if torch.cuda.is_available():
-                inputs, targets = inputs.cuda(), [target.cuda() for target in targets]
+                inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
             outputs = model(inputs)
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
