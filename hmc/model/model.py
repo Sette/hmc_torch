@@ -30,13 +30,13 @@ class ExpandOutputClassification(nn.Module):
         x = self.relu(x)
         return x
 
-
-class OutputNormalization(nn.Module):
-    def __init__(self):
+class OneHotOutputNormalization(nn.Module):
+    def __init__(self, input_shape):
         super().__init__()
+        self.input_shape = input_shape
     def forward(self, x):
         indices = torch.argmax(x, dim=1)
-        return F.one_hot(indices, num_classes=x.size(1)).to(dtype=x.dtype)
+        return F.one_hot(indices, num_classes=self.input_shape).to(dtype=x.dtype)
     def compute_output_shape(self, input_shape):
         return input_shape
 
@@ -78,7 +78,7 @@ class ClassificationModel(nn.Module):
         next_size = 0
         for size, dropout in zip(levels_size, dropouts):
             self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
-            self.output_normalization.append(ExpandOutputClassification(size))
+            self.output_normalization.append(OneHotOutputNormalization(size))
             next_size = size
 
     def forward(self, x):
