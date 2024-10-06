@@ -19,9 +19,8 @@ def transform_predictions(predictions):
     return transformed
 
 class ExpandOutputClassification(nn.Module):
-    def __init__(self, input_shape=512):
+    def __init__(self, input_shape=512, output_shape = 512):
         super(ExpandOutputClassification, self).__init__()
-        output_shape = 512
         self.dense = nn.Linear(input_shape, output_shape)
         self.relu = nn.ReLU()
 
@@ -75,11 +74,10 @@ class ClassificationModel(nn.Module):
             self.lrs = custom_lrs(len(levels_size))
         self.levels = nn.ModuleList()
         self.output_normalization = nn.ModuleList()
-        next_size = 0
+        output_norm_size = 512
         for size, dropout in zip(levels_size, dropouts):
-            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
-            self.output_normalization.append(OneHotOutputNormalization(size))
-            next_size = size
+            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + output_norm_size))
+            self.output_normalization.append(ExpandOutputClassification(input_shape=size))
 
     def forward(self, x):
         outputs = []
