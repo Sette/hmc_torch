@@ -90,7 +90,7 @@ class ClassificationModel(nn.Module):
                 current_input = torch.cat((current_output.detach(), x), dim=1)
             current_output = level(current_input)
             outputs.append(current_output)
-            current_output = self.output_normalization(current_output)
+            current_output = self.output_normalization[i](current_output)
         assert isinstance(outputs, object)
         return outputs
 
