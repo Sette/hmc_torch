@@ -50,7 +50,7 @@ def run():
         torch.optim.SGD(level.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5) for level, lr in zip(model.levels, lrs)
     ]
 
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     if torch.cuda.is_available():
         model = model.to('cuda')
@@ -106,7 +106,7 @@ def run():
                 outputs = model(inputs)
                 for index, (output, target) in enumerate(zip(outputs, targets)):
                     loss = criterion(output, target)
-                    local_val_losses[index] += loss.item()
+                    local_val_losses[index] += loss.item() 
 
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
         global_val_loss = sum(local_val_losses) / metadata['max_depth']
@@ -115,14 +115,18 @@ def run():
         show_local_losses(local_val_losses, set='Val')
         show_global_loss(global_val_loss, set='Val')
 
-        if global_val_loss < best_val_loss:
-            best_val_loss = global_val_loss
-            patience_counter = 0
+        if round(global_val_loss, 2) < best_val_loss:
+            best_val_loss = round(global_val_loss, 2)
+            print('new best model')
             torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
-            predict = model.predict(testset_path=metadata['test_torch_path'], batch_size=64)
         else:
             patience_counter += 1
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
+                torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
+                predict = model.predict(args.input_path, batch_size=64)
+                #predict.to_csv(os.path.join(model_path,'predict.csv'),index=False)
                 return predict
+    predict = model.predict(args.input_path, batch_size=64)
+    #predict.to_csv(os.path.join(model_path,'predict.csv'),index=False)
     return predict

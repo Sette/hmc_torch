@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import pandas as pd
+import os
 
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
@@ -18,9 +20,11 @@ def transform_predictions(predictions):
     
     return transformed
 
+
 class ExpandOutputClassification(nn.Module):
-    def __init__(self, input_shape=512, output_shape = 512):
+    def __init__(self, input_shape=512):
         super(ExpandOutputClassification, self).__init__()
+        output_shape = 512
         self.dense = nn.Linear(input_shape, output_shape)
         self.relu = nn.ReLU()
 
@@ -30,14 +34,16 @@ class ExpandOutputClassification(nn.Module):
         return x
 
 class OneHotOutputNormalization(nn.Module):
-    def __init__(self, input_shape):
+    def __init__(self, num_classes, threshold=0.5):
         super().__init__()
-        self.input_shape = input_shape
+        self.num_classes = num_classes
+        self.threshold = threshold
+
     def forward(self, x):
-        indices = torch.argmax(x, dim=1)
-        return F.one_hot(indices, num_classes=self.input_shape).to(dtype=x.dtype)
-    def compute_output_shape(self, input_shape):
-        return input_shape
+        # Se o valor for maior que o limiar, a classe é considerada ativa (multi-label)
+        binary_output = (x >= self.threshold).int()
+        return binary_output.to(dtype=x.dtype, device=x.device)
+
 
 class BuildClassification(nn.Module):
     def __init__(self, size, dropout, input_shape=1024):
@@ -74,10 +80,11 @@ class ClassificationModel(nn.Module):
             self.lrs = custom_lrs(len(levels_size))
         self.levels = nn.ModuleList()
         self.output_normalization = nn.ModuleList()
-        output_norm_size = 512
+        next_size = 0
         for size, dropout in zip(levels_size, dropouts):
-            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + output_norm_size))
-            self.output_normalization.append(ExpandOutputClassification(input_shape=size))
+            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
+            self.output_normalization.append(OneHotOutputNormalization(size))
+            next_size = size
 
     def forward(self, x):
         outputs = []
@@ -86,27 +93,44 @@ class ClassificationModel(nn.Module):
         for i, level in enumerate(self.levels):
             if i != 0:
                 current_input = torch.cat((current_output.detach(), x), dim=1)
-            current_output = level(current_input)
-            outputs.append(current_output)
-            current_output = self.output_normalization[i](current_output)
-        assert isinstance(outputs, object)
+            local_output = level(current_input)
+            outputs.append(local_output)
+            current_output = self.output_normalization[i](local_output)
         return outputs
-
-    def predict(self, testset_path, batch_size=64):
+    
+    def predict(self, base_path, batch_size=64):
+        torch_path = os.path.join(base_path, 'torch')
+        test_torch_path = os.path.join(torch_path, 'test')
+        #test_csv_path = os.path.join(base_path, 'test.csv')
         self.eval()  
-        ds_test = HMCDataset(testset_path, self.levels_size)
-        df_test = ds_test.to_dataframe()
+        ds_test = HMCDataset(test_torch_path, self.levels_size, testset=True)
+        #df_test = pd.read_csv(test_csv_path)
         test_loader = DataLoader(ds_test, batch_size=batch_size, shuffle=False)
         predictions = []
         with torch.no_grad():
-            for inputs, _ in test_loader:
+            for track_id, inputs, _ in test_loader:
+                # Para armazenar as saídas binárias de cada batch
+                batch_predictions = []
                 if torch.cuda.is_available():
                     inputs = inputs.cuda()
-                binary_outputs = []
-                for output, threshold in zip(self(inputs), self.thresholds):
-                    binary_outputs.append((output >= threshold).cpu().detach().numpy().astype(int))
-                predictions.append(binary_outputs)
-        output_list = [np.vstack(level_targets) for level_targets in zip(*predictions)]
-        output_list = transform_predictions(output_list)
-        df_test['predictions'] = output_list
-        return df_test
+                # Recebe saídas para todos os níveis
+                outputs_per_level = self(inputs)
+                #print(outputs_per_level)
+                levels_pred = {}
+                for level, pred in enumerate(outputs_per_level, start=1):
+                    level_name = f'level{level}'
+                    levels_pred[level_name] = pred
+                return track_id, levels_pred
+                # Itera sobre as saídas de cada nível e aplica o threshold correspondente
+                #for level_output, _ in zip(outputs_per_level, self.thresholds):
+                    # Aplica o threshold para converter em saída binária (0 ou 1)
+                    #binary_output = (level_output >= threshold).float()  #  threshold
+                    #batch_predictions.append(binary_output.cpu().detach().numpy())  # Converte para NumPy e armazena
+                #    batch_predictions.append(level_output.cpu().detach().numpy())
+                    # Armazena as previsões do batch atual para todos os níveis
+            #predictions.append(batch_predictions)
+            #output_list = [level_targets for level_targets in zip(*predictions)]
+            #output_list = transform_predictions(output_list)
+
+        #df_test['predictions'] = output_list
+        return predictions

@@ -1,16 +1,25 @@
 import os
 import torch
 from torch.utils.data import Dataset
-
+import ast
 import pandas as pd
 import numpy as np
 
 BUFFER_SIZE = 10
 
+# Função para converter a string em lista de np.array
+def convert_to_list_of_arrays(val):
+    # Converte string para uma lista de strings
+    list_str = ast.literal_eval(val)
+    # Converte cada item da lista para um array NumPy
+    return [np.array(item) for item in list_str]
+
+
 class HMCDataset(Dataset):
-    def __init__(self, files, levels_size):
+    def __init__(self, files, levels_size, testset=False):
         self.files = files
         self.levels_size = levels_size
+        self.testset = testset
         self.data = self.load_data()
         
     def to_dataframe(self):
@@ -19,7 +28,10 @@ class HMCDataset(Dataset):
         for example in self.data:
             for level in range(1, len(self.levels_size) + 1):
                 labels.update({f'level{level}': example[f'level{level}']})
-            record = {'features': example['features'], 'labels': labels}
+            if self.testset:
+                record = {'track_id': example['track_id'], 'features': example['features'], 'labels': labels}
+            else:
+                record = {'features': example['features'], 'labels': labels}
             records.append(record)
         return pd.DataFrame(records)
 
@@ -36,9 +48,12 @@ class HMCDataset(Dataset):
     def __getitem__(self, idx):
         example = self.data[idx]
         features = torch.tensor(example['features'], dtype=torch.float32)
-        #track_id = example['track_id']
-        labels = [torch.tensor(np.array(example[f'level{level}']), dtype=torch.float32)
-                  for level in range(1, len(self.levels_size) + 1)]
-        return  features, labels
+        labels = [torch.tensor(example[f'level{level}'], dtype=torch.float32)
+            for level in range(1, len(self.levels_size) + 1)]
+        if self.testset:
+            track_id = torch.tensor(example['track_id'], dtype=torch.int64)
+            return track_id, features, labels
+        
+        return features, labels
 
 

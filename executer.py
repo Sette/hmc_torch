@@ -33,11 +33,15 @@ sys.argv = [
 'script.py',
 '--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
 '--output_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
-'--batch_size', '128',
-'--epochs', '20',
-'--dropout', '0.3', '0.3', '0.3', '0.3',
-'--patience', '5'
+'--batch_size', '64',
+'--epochs', '10',
+'--thresholds', '0.5', '0.5', '0.5', '0.5',
+'--lrs', '0.001', '0.001', '0.001', '0.001',
+'--dropout', '0.3', '0.3', '0.3', '0.1',
+'--patience', '2'
 ]
+
+
 
 
 # %%
@@ -45,7 +49,7 @@ sys.argv = [
 time_start = dt.now(UTC)
 print("[{}] Experiment started at {}".format(id, time_start.strftime("%H:%M:%S")))
 print(".......................................")
-run()
+df_predict = run()
 time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
