@@ -78,28 +78,15 @@ class ClassificationModel(nn.Module):
         else:
             self.lrs = lrs
         self.levels = nn.ModuleList()
-        self.output_normalization = nn.ModuleList()
-        output_shape = 128
-        level_count = 0
         for size, dropout in zip(levels_size, dropouts):
-            if level_count == 0:
-                self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size))
-            else:
-                self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + output_shape))
-            output_normalized = ExpandOutputClassification(input_shape=size, output_shape=output_shape)
-            self.output_normalization.append(output_normalized)
-            level_count +=1
+            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size))
 
     def forward(self, x):
         outputs = []
         current_input = x
-        current_output = current_input
-        for i, level in enumerate(self.levels):
-            if i != 0:
-                current_input = torch.cat((current_output.detach(), x), dim=1)
+        for level in self.levels:
             local_output = level(current_input)
             outputs.append(local_output)
-            current_output = self.output_normalization[i](local_output)
         return outputs
     
     def predict(self, base_path, batch_size=64):
