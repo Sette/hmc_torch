@@ -22,9 +22,8 @@ def transform_predictions(predictions):
 
 
 class ExpandOutputClassification(nn.Module):
-    def __init__(self, input_shape=512):
-        super(ExpandOutputClassification, self).__init__()
-        output_shape = 512
+    def __init__(self, input_shape=512, output_shape=512):
+        super().__init__()
         self.dense = nn.Linear(input_shape, output_shape)
         self.relu = nn.ReLU()
 
@@ -52,19 +51,17 @@ class BuildClassification(nn.Module):
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(input_shape // 2, size)
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu1(x)
         x = self.dropout1(x)
         x = self.fc2(x)
-        x = self.sigmoid(x)
         return x
 
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropouts=None, thresholds=None, lr=None):
+    def __init__(self, levels_size, sequence_size=1280, dropouts=None, thresholds=None, lrs=None):
         super().__init__()
         self.sequence_size = sequence_size
         self.levels_size = levels_size
@@ -76,15 +73,22 @@ class ClassificationModel(nn.Module):
             self.dropouts = custom_dropouts(len(levels_size))
         else:
             self.dropouts = dropouts
-        if not lr:
+        if not lrs:
             self.lrs = custom_lrs(len(levels_size))
+        else:
+            self.lrs = lrs
         self.levels = nn.ModuleList()
         self.output_normalization = nn.ModuleList()
-        next_size = 0
+        output_shape = 128
+        level_count = 0
         for size, dropout in zip(levels_size, dropouts):
-            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + next_size))
-            self.output_normalization.append(OneHotOutputNormalization(size))
-            next_size = size
+            if level_count == 0:
+                self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size))
+            else:
+                self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size + output_shape))
+            output_normalized = ExpandOutputClassification(input_shape=size, output_shape=output_shape)
+            self.output_normalization.append(output_normalized)
+            level_count +=1
 
     def forward(self, x):
         outputs = []

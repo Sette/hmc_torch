@@ -21,7 +21,7 @@ def run():
     parser = get_parser()
     args = parser.parse_args()
 
-    dropouts = [float(rate) for rate in args.dropout]
+    dropouts = [float(rate) for rate in args.dropouts]
     thresholds = [float(threshold) for threshold in args.thresholds]
     lrs = [float(threshold) for threshold in args.lrs]
 
@@ -41,7 +41,7 @@ def run():
         'thresholds': thresholds
     }
 
-    assert len(args.dropout) == metadata['max_depth']
+    assert len(args.dropouts) == metadata['max_depth']
     assert len(args.lrs) == metadata['max_depth']
 
     model = ClassificationModel(**params)
