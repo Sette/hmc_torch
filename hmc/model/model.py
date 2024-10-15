@@ -47,16 +47,23 @@ class OneHotOutputNormalization(nn.Module):
 class BuildClassification(nn.Module):
     def __init__(self, size, dropout, input_shape=1024):
         super(BuildClassification, self).__init__()
+        # First linear layer reduces the dimensionality by half
         self.fc1 = nn.Linear(input_shape, input_shape // 2)
         self.relu1 = nn.ReLU()
+        # Apply dropout after the activation
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(input_shape // 2, size)
+        # Sigmoid activation for multi-label classification (outputs in range [0, 1])
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        # Apply the first layer, activation, and dropout
         x = self.fc1(x)
         x = self.relu1(x)
         x = self.dropout1(x)
+        # Apply the second layer and sigmoid activation
         x = self.fc2(x)
+        x = self.sigmoid(x)
         return x
 
 
