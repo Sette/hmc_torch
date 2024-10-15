@@ -51,14 +51,15 @@ class BuildClassification(nn.Module):
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(input_shape // 2, size)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu1(x)
         x = self.dropout1(x)
         x = self.fc2(x)
+        x = self.sigmoid(x)
         return x
-
 
 class ClassificationModel(nn.Module):
     def __init__(self, levels_size, sequence_size=1280, dropouts=None, thresholds=None, lrs=None):
