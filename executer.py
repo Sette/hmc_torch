@@ -34,10 +34,9 @@ sys.argv = [
 '--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
 '--output_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
 '--batch_size', '64',
-'--epochs', '10',
+'--epochs', '100',
 '--thresholds', '0.5', '0.5', '0.5', '0.5',
-'--lrs', '0.001', '0.001', '0.001', '0.001',
-'--dropouts', '0.3', '0.3', '0.3', '0.1',
+'--dropouts', '0.3', '0.3', '0.3', '0.3',
 '--patience', '2'
 ]
 

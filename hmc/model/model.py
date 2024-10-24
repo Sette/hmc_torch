@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.init as init
 import numpy as np
 import pandas as pd
 import os
 
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from hmc.dataset import HMCDataset
-from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs
+from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs, custom_optimizers
 
 def transform_predictions(predictions):
     transformed = []
@@ -45,48 +46,39 @@ class OneHotOutputNormalization(nn.Module):
 
 
 class BuildClassification(nn.Module):
-    def __init__(self, size, dropout, input_shape=1024):
+    def __init__(self, input_shape, hidden_size, output_size):
         super(BuildClassification, self).__init__()
-        # First linear layer reduces the dimensionality by half
-        self.fc1 = nn.Linear(input_shape, input_shape // 2)
-        self.relu1 = nn.ReLU()
-        # Apply dropout after the activation
-        self.dropout1 = nn.Dropout(dropout)
-        self.fc2 = nn.Linear(input_shape // 2, size)
-        # Sigmoid activation for multi-label classification (outputs in range [0, 1])
-        self.sigmoid = nn.Sigmoid()
+        self.classifier = nn.Sequential(
+            nn.Linear(input_shape, hidden_size),
+            nn.Linear(hidden_size, output_size)
+        )
+        self._initialize_weights()
 
     def forward(self, x):
-        # Apply the first layer, activation, and dropout
-        x = self.fc1(x)
-        x = self.relu1(x)
-        x = self.dropout1(x)
-        # Apply the second layer and sigmoid activation
-        x = self.fc2(x)
-        x = self.sigmoid(x)
-        return x
-
+        return self.classifier(x)
+    
+    def _initialize_weights(self):
+        for m in self.classifier:
+            if isinstance(m, nn.Linear):
+                init.kaiming_uniform_(m.weight, a=0.01)
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, sequence_size=1280, dropouts=None, thresholds=None, lrs=None):
+    def __init__(self, levels_size, input_size=1280, hidden_size=640,  dropouts=None, thresholds=None, optimizers=None , lrs=None):
         super().__init__()
-        self.sequence_size = sequence_size
+        self.input_size = input_size
         self.levels_size = levels_size
-        if not thresholds:
-            self.thresholds = custom_thresholds(len(levels_size))
-        else:
-            self.thresholds = thresholds
-        if not dropouts:
-            self.dropouts = custom_dropouts(len(levels_size))
-        else:
-            self.dropouts = dropouts
-        if not lrs:
-            self.lrs = custom_lrs(len(levels_size))
-        else:
-            self.lrs = lrs
-        self.levels = nn.ModuleList()
-        for size, dropout in zip(levels_size, dropouts):
-            self.levels.append(BuildClassification(size, dropout, input_shape=sequence_size))
+        self.dropouts = dropouts if dropouts is not None else custom_dropouts(len(levels_size))
+        self.thresholds = thresholds if thresholds is not None else custom_thresholds(len(levels_size))
+        self.lrs = lrs if lrs is not None else custom_lrs(len(levels_size))
+        self.optimizers = optimizers if optimizers is not None else custom_optimizers(len(levels_size))
+
+
+        self.levels = nn.ModuleList([
+            BuildClassification(input_size, hidden_size, level_size)
+            for level_size in levels_size
+        ])
 
     def forward(self, x):
         outputs = []
@@ -113,9 +105,12 @@ class ClassificationModel(nn.Module):
                     inputs = inputs.cuda()
                 # Recebe saídas para todos os níveis
                 outputs_per_level = self(inputs)
+                # Aplicando a sigmoid em cada tensor da lista de outputs
+                prob_per_level = [F.sigmoid(output) for output in outputs_per_level]
+
                 #print(outputs_per_level)
                 levels_pred = {}
-                for level, pred in enumerate(outputs_per_level, start=1):
+                for level, pred in enumerate(prob_per_level, start=1):
                     level_name = f'level{level}'
                     levels_pred[level_name] = pred
                 return track_id, levels_pred

@@ -23,7 +23,6 @@ def run():
 
     dropouts = [float(rate) for rate in args.dropouts]
     thresholds = [float(threshold) for threshold in args.thresholds]
-    lrs = [float(threshold) for threshold in args.lrs]
 
     metadata_path = os.path.join(args.input_path, 'metadata.json')
     labels_path = os.path.join(args.input_path, 'labels.json')
@@ -36,7 +35,7 @@ def run():
 
     params = {
         'levels_size': labels['levels_size'],
-        'sequence_size': metadata['sequence_size'],
+        'input_size': metadata['sequence_size'],
         'dropouts': dropouts,
         'thresholds': thresholds
     }
@@ -46,15 +45,14 @@ def run():
 
     model = ClassificationModel(**params)
 
-    optimizers = [
-        torch.optim.SGD(level.parameters(), lr=lr, momentum=0.9, weight_decay=1e-5) for level, lr in zip(model.levels, lrs)
-    ]
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
 
-    criterion = nn.BCEWithLogitsLoss()
+    criterions = [nn.BCEWithLogitsLoss(reduction='mean') for _ in labels['levels_size']]
 
     if torch.cuda.is_available():
         model = model.to('cuda')
-        criterion = criterion.to('cuda')
+        criterions = [criterion.to('cuda') for criterion in criterions]
+        
 
     torch_path = os.path.join(args.input_path, 'torch')
     metadata['train_torch_path'] = os.path.join(torch_path, 'train')
@@ -82,13 +80,20 @@ def run():
             if torch.cuda.is_available():
                 inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
             outputs = model(inputs)
+            
+            # Zerar os gradientes antes de cada batch
+            optimizer.zero_grad()
 
+            total_loss = 0.0
             for index, (output, target) in enumerate(zip(outputs, targets)):
-                optimizers[index].zero_grad()
-                loss = criterion(output, target)
-                loss.backward()
-                optimizers[index].step()  
+                loss = criterions[index](output, target)
+                total_loss += loss
                 local_train_losses[index] += loss.item()
+
+        # Backward pass (cálculo dos gradientes)
+        total_loss.backward()
+        
+        optimizer.step()
 
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
         global_train_loss = sum(local_train_losses) / metadata['max_depth']
@@ -96,7 +101,7 @@ def run():
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='Train')
         show_global_loss(global_train_loss, set='Train')
-
+            
         model.eval()
         local_val_losses = [0.0 for _ in range(metadata['max_depth'])]
         with torch.no_grad():
@@ -104,8 +109,11 @@ def run():
                 if torch.cuda.is_available():
                     inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
                 outputs = model(inputs)
+
+                total_val_loss = 0.0
                 for index, (output, target) in enumerate(zip(outputs, targets)):
-                    loss = criterion(output, target)
+                    loss = criterions[index](output, target)
+                    total_val_loss += loss
                     local_val_losses[index] += loss.item() 
 
         local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
@@ -115,18 +123,15 @@ def run():
         show_local_losses(local_val_losses, set='Val')
         show_global_loss(global_val_loss, set='Val')
 
-        if round(global_val_loss, 2) < best_val_loss:
-            best_val_loss = round(global_val_loss, 2)
+        current_val_loss = round(global_val_loss, 4)
+        if current_val_loss <= best_val_loss - 2e-4:
+            best_val_loss = current_val_loss
             print('new best model')
-            torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
+            torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
         else:
-            patience_counter += 1
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
-                torch.save(model.state_dict(), os.path.join(model_path, 'best_binary.pth'))
-                predict = model.predict(args.input_path, batch_size=64)
-                #predict.to_csv(os.path.join(model_path,'predict.csv'),index=False)
-                return predict
-    predict = model.predict(args.input_path, batch_size=64)
-    #predict.to_csv(os.path.join(model_path,'predict.csv'),index=False)
-    return predict
+                return None
+            
+            patience_counter += 1
+    return None
