@@ -47,7 +47,7 @@ def run():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
 
-    criterions = [nn.BCEWithLogitsLoss(reduction='mean') for _ in labels['levels_size']]
+    criterions = [nn.BCEWithLogitsLoss(reduction='sum') for _ in labels['levels_size']]
 
     if torch.cuda.is_available():
         model = model.to('cuda')

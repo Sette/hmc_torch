@@ -33,16 +33,19 @@ class ExpandOutputClassification(nn.Module):
         x = self.relu(x)
         return x
 
-class OneHotOutputNormalization(nn.Module):
-    def __init__(self, num_classes, threshold=0.5):
-        super().__init__()
-        self.num_classes = num_classes
-        self.threshold = threshold
+class OutputNormalization(nn.Module):
+    def __init__(self):
+        super(OutputNormalization, self).__init__()
 
     def forward(self, x):
-        # Se o valor for maior que o limiar, a classe é considerada ativa (multi-label)
-        binary_output = (x >= self.threshold).int()
-        return binary_output.to(dtype=x.dtype, device=x.device)
+        # Obtém o índice do maior valor em cada linha (axis=1)
+        max_indices = torch.argmax(x, dim=1)
+        # Converte para one-hot encoding
+        one_hot_output = F.one_hot(max_indices, num_classes=x.size(1))
+        return one_hot_output.to(x.dtype)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
 
 class BuildClassification(nn.Module):
@@ -65,7 +68,7 @@ class BuildClassification(nn.Module):
                     init.constant_(m.bias, 0)
 
 class ClassificationModel(nn.Module):
-    def __init__(self, levels_size, input_size=1280, hidden_size=640,  dropouts=None, thresholds=None, optimizers=None , lrs=None):
+    def __init__(self, levels_size, input_size=1280, hidden_size=640, dropouts=None, thresholds=None, optimizers=None , lrs=None):
         super().__init__()
         self.input_size = input_size
         self.levels_size = levels_size
@@ -73,19 +76,25 @@ class ClassificationModel(nn.Module):
         self.thresholds = thresholds if thresholds is not None else custom_thresholds(len(levels_size))
         self.lrs = lrs if lrs is not None else custom_lrs(len(levels_size))
         self.optimizers = optimizers if optimizers is not None else custom_optimizers(len(levels_size))
-
-
-        self.levels = nn.ModuleList([
-            BuildClassification(input_size, hidden_size, level_size)
-            for level_size in levels_size
-        ])
-
+        self.levels = nn.ModuleList()
+        self.output_normalization = nn.ModuleList()
+        next_size = 0
+        for level_size in levels_size:
+            self.levels.append(BuildClassification(input_size + next_size, hidden_size, level_size))
+            self.output_normalization.append(OutputNormalization())
+            next_size = level_size
+        
+        
     def forward(self, x):
         outputs = []
         current_input = x
-        for level in self.levels:
+        current_output = current_input
+        for i, level in enumerate(self.levels):
+            if i != 0:
+                current_input = torch.cat((current_output.detach(), x), dim=1)
             local_output = level(current_input)
             outputs.append(local_output)
+            current_output = self.output_normalization[i](local_output)
         return outputs
     
     def predict(self, base_path, batch_size=64):
