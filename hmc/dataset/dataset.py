@@ -226,7 +226,7 @@ class Dataset:
             self.columns = json.load(f)
 
         self.load_data(
-            csv_file, is_go
+            csv_file
         )
         self.to_eval = [t not in to_skip for t in self.categories['labels']]
 
@@ -262,7 +262,7 @@ class Dataset:
 
 
 
-    def load_data(self, csv_file, is_go):
+    def load_data(self, csv_file):
         """
         Load features and labels from CSV, and optionally a hierarchy graph from JSON.
         """
