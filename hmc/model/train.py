@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from hmc.model import ClassificationModel
+from hmc.model import HMCLocalClassificationModel
 from hmc.dataset import HMCDataset
 from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
@@ -43,7 +43,7 @@ def run():
     assert len(args.dropouts) == metadata['max_depth']
     assert len(args.lrs) == metadata['max_depth']
 
-    model = ClassificationModel(**params)
+    model = HMCLocalClassificationModel(**params)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
 
