@@ -210,13 +210,42 @@ def run_constrained():
 
 
     # Set seed
-    seed = args.seed
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # Compute matrix of ancestors R
+    # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is an ancestor of class j.
+
+    # Create an n x n zero matrix R (same shape as train.A)
+    R = np.zeros(train.A.shape)
+
+    # Fill the diagonal with 1, because each class is considered its own ancestor
+    np.fill_diagonal(R, 1)
+
+    # Build a directed graph g from the adjacency matrix train.A
+    # Here, train. A indicates parent-child relationships between classes.
+    # nx.DiGraph(train.A) creates a directed graph where an edge i->j means class i is a parent (or ancestor) of class j.
+    g = nx.DiGraph(train.A)
+
+    # For each class i
+    for i in range(len(train.A)):
+        # Get the list of all descendants of class i in the graph g.
+        # nx.descendants(g, i) returns all nodes reachable from i, thus all descendants of i.
+        descendants = list(nx.descendants(g, i))
+        if descendants:
+            # Mark that i is an ancestor of all these descendants.
+            # Setting R[i, descendants] = 1 means that in row i of R, 
+            # the columns corresponding to these descendants are set to 1.
+            R[i, descendants] = 1
+
+    # Convert the numpy array R to a PyTorch tensor
+    R = torch.tensor(R)
+
+    # Transpose R. Initially, R[i, j] = 1 means class i is an ancestor of class j.
+    # By transposing, we have R[j, i] = 1 means class i is an ancestor of class j.
+    # Depending on how the model output is indexed, this transpose might be required.
+    R = R.transpose(1, 0)
+
+    # Add an extra dimension at the start, making R of shape (1, n, n).
+    # This can be useful for broadcasting in the code that uses R.
+    R = R.unsqueeze(0).to(device)
 
     # Pick device
     device = torch.device("cuda:"+str(args.device) if torch.cuda.is_available() else "cpu")
@@ -234,8 +263,7 @@ def run_constrained():
         #train, val, test = initialize_dataset(dataset_name, datasets)
         train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
     
-    different_from_0 = torch.tensor(np.array((test.Y.sum(0)!=0), dtype = np.uint8), dtype=torch.uint8)
-
+    
     # Compute matrix of ancestors R
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
     R = np.zeros(train.A.shape)
@@ -307,33 +335,53 @@ def run_constrained():
         train_score = 0
 
         for i, (x, labels) in enumerate(train_loader):
-
             x = x.to(device)
             labels = labels.to(device)
 
             # Clear gradients w.r.t. parameters
             optimizer.zero_grad()
+
+            # Forward pass: compute the model output
             output = model(x.float())
-        
-            constr_output = get_constr_out(output, R)
-            train_output = labels*output.double()
-            train_output = get_constr_out(train_output, R)
-            train_output = (1-labels)*constr_output.double() + labels*train_output
-            loss = criterion(train_output[:,train.to_eval], labels[:,train.to_eval]) 
-            predicted = constr_output.data > 0.5
-            # Total number of labels
-            total_train += labels.size(0) * labels.size(1)
-            # Total correct predictions
-            correct_train += (predicted == labels.byte()).sum()
-                    
-            # Getting gradients w.r.t. parameters
-            loss.backward()
-            # Updating parameters
-            optimizer.step()
             
+            # Apply hierarchical constraints to the raw output
+            constr_output = get_constr_out(output, R)
+            
+            # Here, we combine labels and output in a particular way:
+            # labels * output: for positions where label=1, keep output; where label=0, set output=0.
+            train_output = labels * output.double()
+            
+            # Apply constraints again to the filtered output
+            train_output = get_constr_out(train_output, R)
+            
+            # Recombine the constrained outputs:
+            # (1 - labels)*constr_output + labels*train_output means:
+            # - Where label=0, we use constr_output
+            # - Where label=1, we use train_output (the already filtered and constrained one)
+            train_output = (1 - labels) * constr_output.double() + labels * train_output
+            
+            # Compute the loss only on selected output indices (train.to_eval)
+            loss = criterion(train_output[:, train.to_eval], labels[:, train.to_eval]) 
+            
+            # Make binary predictions (threshold at 0.5)
+            predicted = constr_output.data > 0.5
+            
+            # Update training statistics:
+            # total number of labels (instances * number of classes)
+            total_train += labels.size(0) * labels.size(1)
+            # count correct predictions
+            correct_train += (predicted == labels.byte()).sum()
+            
+            # Backpropagation
+            loss.backward()
+            # Parameter update
+            optimizer.step()
+                    
+        # Evaluation mode
         model.eval()
+
+        # Move tensors to CPU for further processing, evaluation, or logging
         constr_output = constr_output.to('cpu')
-        labels = labels.to('cpu')
         train_score = average_precision_score(labels[:,train.to_eval], constr_output.data[:,train.to_eval], average='micro') 
 
         for i, (x,y) in enumerate(val_loader):
