@@ -1,1 +1,1 @@
-from hmc.model.model import HMCLocalClassificationModel, ConstrainedFFNNGlobalModel, get_constr_out
+from hmc.model.model import HMCLocalClassificationModel, ConstrainedFFNNModel, get_constr_out

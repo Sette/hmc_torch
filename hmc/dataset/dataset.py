@@ -237,7 +237,7 @@ class GOFUNDataset:
         self.g = nx.DiGraph()
 
         for cat in self.categories['labels']:
-            terms = cat.split('/')
+            terms = cat.split('.')
             if is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
@@ -252,11 +252,12 @@ class GOFUNDataset:
         # Para salvar em formato GraphML
         nx.write_graphml(self.g, self.graph_path)
 
-        nodes = sorted(self.g.nodes(),
+        self.nodes = sorted(self.g.nodes(),
                 key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (len(x.split('.')), x)
         )
-        self.nodes_idx = dict(zip(nodes, range(len(nodes))))
+        self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
         self.g_t = self.g.reverse()
+        self.A =  nx.to_numpy_array(self.g, nodelist=self.nodes)
 
 
 
@@ -294,13 +295,15 @@ class GOFUNDataset:
 
 
 
-def initialize_dataset(name, fun_path, go_path):
+def initialize_dataset(name, dataset_path, is_go=True):
     """
     Initialize train, validation, and test datasets.
     """
+    go_path = os.path.join(dataset_path, 'GO')
+    fun_path = os.path.join(dataset_path, 'FUN')
     datasets = load_dataset_paths(fun_path, go_path)
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
-    train_data = Dataset(train_csv, labels_json, is_go=True)
-    val_data = Dataset(valid_csv, labels_json, is_go=True)
-    test_data = Dataset(test_csv, labels_json, is_go=True)
+    train_data = GOFUNDataset(train_csv, labels_json, is_go)
+    val_data = GOFUNDataset(valid_csv, labels_json, is_go)
+    test_data = GOFUNDataset(test_csv, labels_json, is_go)
     return train_data, val_data, test_data

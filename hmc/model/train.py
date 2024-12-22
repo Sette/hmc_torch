@@ -4,8 +4,8 @@ import networkx as nx
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from hmc.model import HMCLocalClassificationModel, ConstrainedFFNNGlobalModel, get_constr_out
-from hmc.dataset import HMCDataset
+from hmc.model import HMCLocalClassificationModel, ConstrainedFFNNModel, get_constr_out
+from hmc.dataset import HMCDataset, initialize_dataset
 from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
@@ -155,7 +155,7 @@ def run():
             patience_counter += 1
     return None
 
-def run_constrained():
+def run_constrait():
 
     # Training settings
     parser = argparse.ArgumentParser(description='Train neural network')
@@ -187,23 +187,81 @@ def run_constrained():
                         help='random seed (default:0)')
 
     args = parser.parse_args()
-    hyperparams = {'batch_size':args.batch_size, 'num_layers':args.num_layers, 'dropout':args.dropout, 'non_lin':args.non_lin, 'hidden_dim':args.hidden_dim, 'lr':args.lr, 'weight_decay':args.weight_decay}
-
-    assert('_' in args.dataset)
-    assert('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
-
 
     # Load train, val and test set
     dataset_name = args.dataset
     data = dataset_name.split('_')[0]
     ontology = dataset_name.split('_')[1]
 
+    # Dictionaries with number of features and number of labels for each dataset
+    input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'derisi': 63,
+                  'eisen': 79, 'expr': 561, 'gasch1': 173, 'gasch2': 52, 'seq': 529, 'spo': 86}
+    output_dims_FUN = {'cellcycle': 499, 'derisi': 499, 'eisen': 461, 'expr': 499, 'gasch1': 499, 'gasch2': 499,
+                       'seq': 499, 'spo': 499}
+    output_dims_GO = {'cellcycle': 4122, 'derisi': 4116, 'eisen': 3570, 'expr': 4128, 'gasch1': 4122, 'gasch2': 4128,
+                      'seq': 4130, 'spo': 4116}
+    output_dims_others = {'diatoms': 398, 'enron': 56, 'imclef07a': 96, 'imclef07d': 46, 'reuters': 102}
+    output_dims = {'FUN': output_dims_FUN, 'GO': output_dims_GO, 'others': output_dims_others}
+
+    # Dictionaries with the hyperparameters associated to each dataset
+    hidden_dims_FUN = {'cellcycle': 500, 'derisi': 500, 'eisen': 500, 'expr': 1250, 'gasch1': 1000, 'gasch2': 500,
+                       'seq': 2000, 'spo': 250}
+    hidden_dims_GO = {'cellcycle': 1000, 'derisi': 500, 'eisen': 500, 'expr': 4000, 'gasch1': 500, 'gasch2': 500,
+                      'seq': 9000, 'spo': 500}
+    hidden_dims_others = {'diatoms': 2000, 'enron': 1000, 'imclef07a': 1000, 'imclef07d': 1000}
+    hidden_dims = {'FUN': hidden_dims_FUN, 'GO': hidden_dims_GO, 'others': hidden_dims_others}
+    lrs_FUN = {'cellcycle': 1e-4, 'derisi': 1e-4, 'eisen': 1e-4, 'expr': 1e-4, 'gasch1': 1e-4, 'gasch2': 1e-4,
+               'seq': 1e-4, 'spo': 1e-4}
+    lrs_GO = {'cellcycle': 1e-4, 'derisi': 1e-4, 'eisen': 1e-4, 'expr': 1e-4, 'gasch1': 1e-4, 'gasch2': 1e-4,
+              'seq': 1e-4, 'spo': 1e-4}
+    lrs_others = {'diatoms': 1e-5, 'enron': 1e-5, 'imclef07a': 1e-5, 'imclef07d': 1e-5}
+    lrs = {'FUN': lrs_FUN, 'GO': lrs_GO, 'others': lrs_others}
+    epochss_FUN = {'cellcycle': 106, 'derisi': 67, 'eisen': 110, 'expr': 20, 'gasch1': 42, 'gasch2': 123, 'seq': 13,
+                   'spo': 115}
+    epochss_GO = {'cellcycle': 62, 'derisi': 91, 'eisen': 123, 'expr': 70, 'gasch1': 122, 'gasch2': 177, 'seq': 45,
+                  'spo': 103}
+    epochss_others = {'diatoms': 474, 'enron': 133, 'imclef07a': 592, 'imclef07d': 588}
+    epochss = {'FUN': epochss_FUN, 'GO': epochss_GO, 'others': epochss_others}
+
+    # Set the hyperparameters
+    batch_size = 4
+    num_layers = 3
+    dropout = 0.7
+    non_lin = 'relu'
+    hidden_dim = hidden_dims[ontology][data]
+    lr = lrs[ontology][data]
+    weight_decay = 1e-5
+    num_epochs = epochss[ontology][data]
+    hyperparams = {'batch_size': batch_size, 'num_layers': num_layers, 'dropout': dropout, 'non_lin': non_lin,
+                   'hidden_dim': hidden_dim, 'lr': lr, 'weight_decay': weight_decay}
+
+    # Set seed
+    seed = args.seed
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    device = torch.device("cuda:" + str(args.device) if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available:
+        pin_memory = True
+
+
+    assert('_' in args.dataset)
+    assert('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
+
+    dataset_path = '/home/bruno/storage/data'
+
+    train, val, test = initialize_dataset('spo_FUN', dataset_path, is_go=False)
+
 
    # Dictionaries with number of features and number of labels for each dataset
     input_dims = {'diatoms':371, 'enron':1001,'imclef07a': 80, 'imclef07d': 80,'cellcycle':77, 'church':27, 'derisi':63, 'eisen':79, 'expr':561, 'gasch1':173, 'gasch2':52, 'hom':47034, 'seq':529, 'spo':86}
     output_dims_FUN = {'cellcycle':499, 'church':499, 'derisi':499, 'eisen':461, 'expr':499, 'gasch1':499, 'gasch2':499, 'hom':499, 'seq':499, 'spo':499}
     output_dims_GO = {'cellcycle':4122, 'church':4122, 'derisi':4116, 'eisen':3570, 'expr':4128, 'gasch1':4122, 'gasch2':4128, 'hom':4128, 'seq':4130, 'spo':4116}
-    output_dims_others = {'diatoms':398,'enron':56, 'imclef07a': 96, 'imclef07d': 46, 'reuters':102}
+    #output_dims_others = {'diatoms':398,'enron':56, 'imclef07a': 96, 'imclef07d': 46, 'reuters':102}
     output_dims = {'FUN':output_dims_FUN, 'GO':output_dims_GO, 'others':output_dims_others}
 
 
@@ -312,7 +370,7 @@ def run_constrained():
         num_to_skip = 1 
 
     # Create the model
-    model = ConstrainedFFNNGlobalModel(input_dims[data], args.hidden_dim, output_dims[ontology][data]+num_to_skip, hyperparams, R)
+    model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data]+num_to_skip, hyperparams, R)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay) 
     criterion = nn.BCELoss()
