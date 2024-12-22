@@ -6,7 +6,6 @@ import json
 import pandas as pd
 import numpy as np
 import networkx as nx
-import keras
 
 
 BUFFER_SIZE = 10
@@ -208,8 +207,7 @@ def load_dataset_paths(fun_path, go_path):
     return datasets
 
 
-
-class Dataset:
+class GOFUNDataset:
     def __init__(self, csv_file, labels_json, is_go=False):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
@@ -271,16 +269,18 @@ class Dataset:
 
         self.df['features'] = self.df.features.apply(lambda x : ast.literal_eval(x))
 
+        
         def __process_feature(feature, idx):
             if self.columns['type'][idx] == 'numeric' or self.columns['type'][idx] == 'NUMERIC':
-                if feature != '?':
+                if feature is not None:
                     return float(feature)
-                else:
-                    return None
             else:
+                # Extract categories from the type definition
                 cats = self.columns['type'][idx][1:-1].split(',')
-                cats_bin = {key:keras.utils.to_categorical(i, len(cats)).tolist() for i,key in enumerate(cats)}
-                return cats_bin.get(feature, [0.0]*len(cats))
+                # Create a dictionary mapping categories to one-hot vectors
+                cats_bin = {key: np.eye(len(cats))[i].tolist() for i, key in enumerate(cats)}
+                # Return the one-hot encoded vector or a zero vector if the feature is not in the categories
+                return cats_bin.get(feature, [0.0] * len(cats))
 
         # Features (X)
         def process_features(features):
@@ -289,7 +289,7 @@ class Dataset:
             """
             return [__process_feature(f, i) for i, f in enumerate(features)]
 
-        self.df['processed_features'] = self.df['features'].apply(process_features)
+        #self.df['processed_features'] = self.df['features'].apply(process_features)
 
 
 

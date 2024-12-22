@@ -19,9 +19,7 @@ import torch
 import torch.utils.data
 import torch.nn as nn
 
-from utils import datasets
 import random
-import sys
 
 from sklearn.impute import SimpleImputer
 
@@ -231,7 +229,7 @@ def run_constrained():
         descendants = list(nx.descendants(g, i))
         if descendants:
             # Mark that i is an ancestor of all these descendants.
-            # Setting R[i, descendants] = 1 means that in row i of R, 
+            # Setting R[i, descendants] = 1 means that in row i of R,
             # the columns corresponding to these descendants are set to 1.
             R[i, descendants] = 1
 
@@ -263,7 +261,7 @@ def run_constrained():
         #train, val, test = initialize_dataset(dataset_name, datasets)
         train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
     
-    
+
     # Compute matrix of ancestors R
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
     R = np.zeros(train.A.shape)
@@ -343,40 +341,40 @@ def run_constrained():
 
             # Forward pass: compute the model output
             output = model(x.float())
-            
+
             # Apply hierarchical constraints to the raw output
             constr_output = get_constr_out(output, R)
-            
+
             # Here, we combine labels and output in a particular way:
             # labels * output: for positions where label=1, keep output; where label=0, set output=0.
             train_output = labels * output.double()
-            
+
             # Apply constraints again to the filtered output
             train_output = get_constr_out(train_output, R)
-            
+
             # Recombine the constrained outputs:
             # (1 - labels)*constr_output + labels*train_output means:
             # - Where label=0, we use constr_output
             # - Where label=1, we use train_output (the already filtered and constrained one)
             train_output = (1 - labels) * constr_output.double() + labels * train_output
-            
+
             # Compute the loss only on selected output indices (train.to_eval)
-            loss = criterion(train_output[:, train.to_eval], labels[:, train.to_eval]) 
-            
+            loss = criterion(train_output[:, train.to_eval], labels[:, train.to_eval])
+
             # Make binary predictions (threshold at 0.5)
             predicted = constr_output.data > 0.5
-            
+
             # Update training statistics:
             # total number of labels (instances * number of classes)
             total_train += labels.size(0) * labels.size(1)
             # count correct predictions
             correct_train += (predicted == labels.byte()).sum()
-            
+
             # Backpropagation
             loss.backward()
             # Parameter update
             optimizer.step()
-                    
+
         # Evaluation mode
         model.eval()
 
