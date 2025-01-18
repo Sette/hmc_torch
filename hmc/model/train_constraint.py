@@ -51,13 +51,17 @@ def train_constraint():
     parser.add_argument('--non_lin', type=str, required=True,
                         help='non linearity function to be used in the hidden layers')
 
-    # Other parameters
     parser.add_argument('--device', type=int, default=0,
                         help='device (default:0)')
     parser.add_argument('--num_epochs', type=int, default=2000,
                         help='Max number of epochs to train (default:2000)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed (default:0)')
+    
+    parser.add_argument('--output_path', type=str, required=True,
+                        help='output path')
+    
+    
 
     args = parser.parse_args()
     hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,

@@ -207,7 +207,7 @@ def load_dataset_paths(fun_path, go_path):
 
 
 class GOFUNDataset:
-    def __init__(self, csv_file, labels_json, is_go=False):
+    def __init__(self, csv_file, labels_json, output_path = 'data', is_go=False):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
@@ -216,7 +216,8 @@ class GOFUNDataset:
         self.g_t = None
         self.df = None
         self.X_cont = []
-        self.graph_path = labels_json.replace('-labels.json', '.graphml')
+        labels_json = labels_json.split('/')[-1]
+        self.graph_path = os.path.join(output_path, labels_json.replace('-labels.json', '.graphml'))
         self.columns_path = labels_json.replace('-labels', '')
         self.load_structure(labels_json, is_go)
         with open(self.columns_path, 'r') as f:
@@ -309,7 +310,7 @@ class GOFUNDataset:
 
 
 
-def initialize_dataset(name, dataset_path, is_go=False):
+def initialize_dataset(name, dataset_path, output_path, is_go=False):
     """
     Initialize train, validation, and test datasets.
     """
@@ -321,7 +322,7 @@ def initialize_dataset(name, dataset_path, is_go=False):
         is_go = False
     else:
         is_go = True
-    train_data = GOFUNDataset(train_csv, labels_json, is_go)
-    val_data = GOFUNDataset(valid_csv, labels_json, is_go)
-    test_data = GOFUNDataset(test_csv, labels_json, is_go)
+    train_data = GOFUNDataset(train_csv, labels_json, output_path, is_go)
+    val_data = GOFUNDataset(valid_csv, labels_json, output_path, is_go)
+    test_data = GOFUNDataset(test_csv, labels_json, output_path, is_go)
     return train_data, val_data, test_data
