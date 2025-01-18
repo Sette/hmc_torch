@@ -50,6 +50,9 @@ def train_constraint():
                         help='weight decay')
     parser.add_argument('--non_lin', type=str, required=True,
                         help='non linearity function to be used in the hidden layers')
+    
+    parser.add_argument('--output_path', type=str, required=True,
+                        help='output path')
 
     parser.add_argument('--device', type=int, default=0,
                         help='device (default:0)')
@@ -58,8 +61,7 @@ def train_constraint():
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed (default:0)')
     
-    parser.add_argument('--output_path', type=str, required=True,
-                        help='output path')
+    
     
     
 
@@ -107,7 +109,7 @@ def train_constraint():
         # Load train, val and test set
         data = dataset_name.split('_')[0]
         ontology = dataset_name.split('_')[1]
-        train, val, test = initialize_dataset(dataset_name, args.dataset_path,  is_go=False)
+        train, val, test = initialize_dataset(dataset_name, args.dataset_path, output_path=args.output_path,  is_go=False)
         train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(
             val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
 
