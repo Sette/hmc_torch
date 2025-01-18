@@ -3,7 +3,6 @@ from hmc.model import ConstrainedFFNNModel, get_constr_out
 from hmc.dataset import initialize_dataset
 
 import os
-os.environ["MY_DATA"] = "/home/bruno/storage/data"
 
 import gc
 
@@ -35,6 +34,8 @@ def train_constraint():
     # Required  parameters
     parser.add_argument('--dataset', type=str, required=True,
                         help='dataset')
+    parser.add_argument('--dataset_path', type=str, required=True,
+                        help='dataset path')
     parser.add_argument('--batch_size', type=int, required=True,
                         help='input batch size for training')
     parser.add_argument('--lr', type=float, required=True,
@@ -96,15 +97,13 @@ def train_constraint():
     # Pick device
     device = torch.device("cuda:" + str(args.device) if torch.cuda.is_available() else "cpu")
 
-    dataset_path = os.path.join(os.environ["MY_DATA"],'go_fun','go_fun_hmc')
-
     for dataset_name in datasets:
         print(".......................................")
         print("Experiment with {} dataset ".format(dataset_name))
         # Load train, val and test set
         data = dataset_name.split('_')[0]
         ontology = dataset_name.split('_')[1]
-        train, val, test = initialize_dataset(dataset_name, dataset_path,  is_go=False)
+        train, val, test = initialize_dataset(dataset_name, args.dataset_path,  is_go=False)
         train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(
             val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
 

@@ -46,6 +46,7 @@ sys.argv = [
 sys.argv = [
 'script.py',
 '--dataset', 'all',
+'--dataset_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
 '--batch_size', '32',
 '--lr', '1e-5',
 '--dropout', '0.7',
