@@ -12,7 +12,7 @@ from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
 
 
-def run():
+def train():
     print("========================= PyTorch =========================")
     print("GPUs available: {}".format(torch.cuda.device_count()))
     print("===========================================================")
