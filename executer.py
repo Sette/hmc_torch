@@ -6,6 +6,7 @@ from datetime import UTC
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
 from hmc.model.train import run
+from hmc.model import train_constraint
 
 # %%
 base_path = "/home/bruno/storage/data/fma/trains"
@@ -29,6 +30,7 @@ print(f"Job ID: {job_id}")
 model_path = os.path.join(hmc_path, job_id)
 create_dir(model_path)
 
+'''
 sys.argv = [
 'script.py',
 '--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
@@ -39,18 +41,31 @@ sys.argv = [
 '--dropouts', '0.3', '0.3', '0.3', '0.3',
 '--patience', '2'
 ]
+'''
 
-
-
+sys.argv = [
+'script.py',
+'--dataset', 'all',
+'--batch_size', '32',
+'--lr', '1e-5',
+'--dropout', '0.7',
+'--hidden_dim', '100',
+'--num_layers', '2',
+'--weight_decay', '1e-5',
+'--non_lin', 'relu',
+'--device', '0',
+'--num_epochs', '2000',
+'--seed', '0'
+]
 
 # %%
 # Salvar os argumentos atuais
 time_start = dt.now(UTC)
-print("[{}] Experiment started at {}".format(id, time_start.strftime("%H:%M:%S")))
+print("Experiment started at {}".format(time_start.strftime("%H:%M:%S")))
 print(".......................................")
-df_predict = run()
+df_predict = train_constraint()
 time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
-print("[{}] Experiment finished at {} / elapsed time {}s".format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
+print("Experiment finished at {} / elapsed time {}s".format(time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
 

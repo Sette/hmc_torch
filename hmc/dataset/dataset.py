@@ -17,7 +17,6 @@ def convert_to_list_of_arrays(val):
     # Converte cada item da lista para um array NumPy
     return [np.array(item) for item in list_str]
 
-
 class HMCDataset(Dataset):
     def __init__(self, files, levels_size, testset=False):
         self.files = files
@@ -212,11 +211,11 @@ class GOFUNDataset:
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
-
         self.g = None
         self.nodes_idx = None
         self.g_t = None
         self.df = None
+        self.X_cont = []
         self.graph_path = labels_json.replace('-labels.json', '.graphml')
         self.columns_path = labels_json.replace('-labels', '')
         self.load_structure(labels_json, is_go)
@@ -253,12 +252,50 @@ class GOFUNDataset:
         nx.write_graphml(self.g, self.graph_path)
 
         self.nodes = sorted(self.g.nodes(),
-                key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (len(x.split('.')), x)
+            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (len(x.split('.')), x)
         )
         self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
         self.g_t = self.g.reverse()
         self.A =  nx.to_numpy_array(self.g, nodelist=self.nodes)
 
+    def transform_labels(self):
+        self.Y = []
+        y_ = np.zeros(len(self.nodes))
+        for labels in self.df.categories.values:
+            for t in labels.split('@'):
+                y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
+                y_[self.nodes_idx[t]] = 1
+            self.Y.append(y_)
+        self.Y = np.stack(self.Y)
+
+    def parse_features(self):
+        self.X_cont = []
+        self.X_bin = []
+        for features in self.features:
+            cont_features = []
+            bin_features = []
+            for feature in features:
+                # Se 'item' for uma lista, consideramos como binária
+                if isinstance(feature, list):
+                    # Achatar (flatten) essa sublista e colocar na bin_features
+                    for f in feature:
+                        bin_features.append(f)
+                else:
+                    # Se for float ou int, consideramos feature contínua
+                    if feature is None or feature == 'None' or feature == 'nan' or feature == 'NaN' or type(feature) is None:
+                        cont_features.append(np.nan)
+                    else:
+                        cont_features.append(feature)
+            self.X_cont.append(cont_features)
+            self.X_bin.append(bin_features)
+        
+        self.X_cont = np.array(self.X_cont, dtype=float)
+        self.X_bin = np.array(self.X_bin, dtype=int)
+
+
+    def transform_features(self):
+        self.features = self.df.features.apply(lambda x : ast.literal_eval(x)).tolist()
+        self.parse_features()
 
 
     def load_data(self, csv_file):
@@ -267,35 +304,12 @@ class GOFUNDataset:
         """
         # Load CSV
         self.df = pd.read_csv(csv_file)
-
-        self.df['features'] = self.df.features.apply(lambda x : ast.literal_eval(x))
-
-        
-        def __process_feature(feature, idx):
-            if self.columns['type'][idx] == 'numeric' or self.columns['type'][idx] == 'NUMERIC':
-                if feature is not None:
-                    return float(feature)
-            else:
-                # Extract categories from the type definition
-                cats = self.columns['type'][idx][1:-1].split(',')
-                # Create a dictionary mapping categories to one-hot vectors
-                cats_bin = {key: np.eye(len(cats))[i].tolist() for i, key in enumerate(cats)}
-                # Return the one-hot encoded vector or a zero vector if the feature is not in the categories
-                return cats_bin.get(feature, [0.0] * len(cats))
-
-        # Features (X)
-        def process_features(features):
-            """
-            Convert features from string to a numerical array.
-            """
-            return [__process_feature(f, i) for i, f in enumerate(features)]
-
-        #self.df['processed_features'] = self.df['features'].apply(process_features)
+        self.transform_features()
+        self.transform_labels()
 
 
 
-
-def initialize_dataset(name, dataset_path, is_go=True):
+def initialize_dataset(name, dataset_path, is_go=False):
     """
     Initialize train, validation, and test datasets.
     """
@@ -303,6 +317,10 @@ def initialize_dataset(name, dataset_path, is_go=True):
     fun_path = os.path.join(dataset_path, 'FUN')
     datasets = load_dataset_paths(fun_path, go_path)
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
+    if 'FUN' in name:
+        is_go = False
+    else:
+        is_go = True
     train_data = GOFUNDataset(train_csv, labels_json, is_go)
     val_data = GOFUNDataset(valid_csv, labels_json, is_go)
     test_data = GOFUNDataset(test_csv, labels_json, is_go)
