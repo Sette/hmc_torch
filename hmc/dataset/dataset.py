@@ -313,8 +313,8 @@ def initialize_dataset(name, dataset_path, is_go=False):
     """
     Initialize train, validation, and test datasets.
     """
-    go_path = os.path.join(dataset_path, 'GO')
-    fun_path = os.path.join(dataset_path, 'FUN')
+    go_path = os.path.join(dataset_path, 'gene-ontology-annotated-datasets' ,'GO')
+    fun_path = os.path.join(dataset_path, 'funcat-annotated-datasets', 'FUN')
     datasets = load_dataset_paths(fun_path, go_path)
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
     if 'FUN' in name:
