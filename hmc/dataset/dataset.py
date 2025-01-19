@@ -216,8 +216,8 @@ class GOFUNDataset:
         self.g_t = None
         self.df = None
         self.X_cont = []
-        labels_json = labels_json.split('/')[-1]
-        self.graph_path = os.path.join(output_path, labels_json.replace('-labels.json', '.graphml'))
+        labels_json_name = labels_json.split('/')[-1]
+        self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
         self.columns_path = labels_json.replace('-labels', '')
         self.load_structure(labels_json, is_go)
         with open(self.columns_path, 'r') as f:
