@@ -5,7 +5,7 @@ import sys
 from datetime import UTC
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
-from hmc.model.train import run
+from hmc.model.train import train
 from hmc.model import train_constraint
 
 # %%
@@ -46,17 +46,18 @@ sys.argv = [
 sys.argv = [
 'script.py',
 '--dataset', 'all',
-'--dataset_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
+'--dataset_path', '/home/bruno/storage/data/go_fun',
 '--batch_size', '32',
 '--lr', '1e-5',
 '--dropout', '0.7',
-'--hidden_dim', '100',
+'--hidden_dim', '50',
 '--num_layers', '2',
 '--weight_decay', '1e-5',
 '--non_lin', 'relu',
 '--device', '0',
 '--num_epochs', '2000',
-'--seed', '0'
+'--seed', '0',
+'--output_path', '/home/bruno/storage/models/gofun'
 ]
 
 # %%

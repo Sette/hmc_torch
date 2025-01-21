@@ -102,6 +102,7 @@ def train_constraint():
 
     # Pick device
     device = torch.device("cuda:" + str(args.device) if torch.cuda.is_available() else "cpu")
+    device2 = torch.device("cuda:1")
 
     for dataset_name in datasets:
         print(".......................................")
@@ -169,7 +170,7 @@ def train_constraint():
             # Create the model
         model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip,
                                     hyperparams, R)
-        model.to(device)
+        model.to(device2)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         criterion = nn.BCELoss()
 
