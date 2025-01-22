@@ -4,7 +4,7 @@ from hmc.dataset import initialize_dataset
 
 import os
 
-import gc
+import torch.distributed as dist
 
 import argparse
 
@@ -32,8 +32,9 @@ def train_constraint():
     parser = argparse.ArgumentParser(description='Train neural network')
 
     # Required  parameters
-    parser.add_argument('--dataset', type=str, required=True,
-                        help='dataset')
+    parser.add_argument('--dataset', type=str, required=True, 
+                        nargs='+', default=['seq_GO', 'derisi_GO', '0.6', '0.7'], 
+                        help='List with dataset names to train')
     parser.add_argument('--dataset_path', type=str, required=True,
                         help='dataset path')
     parser.add_argument('--batch_size', type=int, required=True,
@@ -50,10 +51,8 @@ def train_constraint():
                         help='weight decay')
     parser.add_argument('--non_lin', type=str, required=True,
                         help='non linearity function to be used in the hidden layers')
-    
     parser.add_argument('--output_path', type=str, required=True,
                         help='output path')
-
     parser.add_argument('--device', type=int, default=0,
                         help='device (default:0)')
     parser.add_argument('--num_epochs', type=int, default=2000,
@@ -61,24 +60,26 @@ def train_constraint():
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed (default:0)')
     
-    
-    
-    
-
     args = parser.parse_args()
     hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,
                    'non_lin': args.non_lin, 'hidden_dim': args.hidden_dim, 'lr': args.lr,
                    'weight_decay': args.weight_decay}
     ## Insert her a logic to use all datasets with arguments
     
-    if 'all' not in args.dataset:
-        datasets = [args.dataset]
-        assert ('_' in args.dataset)
-        assert ('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
-    else:
+    print(type(args.dataset))
+    
+    if 'all' in args.dataset:
         datasets = ['cellcycle_GO', 'derisi_GO', 'eisen_GO', 'expr_GO', 'gasch1_GO',
-                    'gasch2_GO', 'seq_GO', 'spo_GO', 'cellcycle_FUN', 'derisi_FUN', 'eisen_FUN', 'expr_FUN', 'gasch1_FUN', 'gasch2_FUN', 
-                    'seq_FUN', 'spo_FUN']
+                    'gasch2_GO', 'seq_GO', 'spo_GO', 'cellcycle_FUN', 'derisi_FUN', 
+                    'eisen_FUN', 'expr_FUN', 'gasch1_FUN', 'gasch2_FUN', 'seq_FUN', 'spo_FUN']
+    else:
+        if len(args.dataset) > 1:
+            datasets = [str(dataset) for dataset in args.dataset]
+        else:
+            datasets = [args.dataset]
+            assert ('_' in args.dataset)
+            assert ('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
+        
 
     # Dictionaries with number of features and number of labels for each dataset
     input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'church': 27,
@@ -99,10 +100,23 @@ def train_constraint():
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
-    # Pick device
-    device = torch.device("cuda:" + str(args.device) if torch.cuda.is_available() else "cpu")
-    device2 = torch.device("cuda:1")
+    
+    # Verifica quantas GPUs estão disponíveis
+    num_gpus = torch.cuda.device_count()
+    print(f"Total de GPUs disponíveis: {num_gpus}")
+    # Inicializa o processo
+    if num_gpus > 1:
+        dist.init_process_group(backend='nccl')
+        
+        # Obtém ID da GPU do processo atual
+        local_rank = torch.distributed.get_rank()
+        torch.cuda.set_device(local_rank)
+        device = torch.device(f'cuda:{local_rank}')
+    elif num_gpus == 1:
+        device = torch.device(f'cuda:0')
+    elif num_gpus == 0:
+        device = torch.device('cpu')
+        
 
     for dataset_name in datasets:
         print(".......................................")
@@ -137,8 +151,8 @@ def train_constraint():
             device)
         train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
             train.Y).to(device)
-
-        if train.X_bin:
+        print(train.X_bin.shape)
+        if train.X_bin.shape[0] > 0:
             train.X = np.concatenate([train.X_count, train.X_bin], axis=1)
             val.X = np.concatenate([val.X_count, val.X_bin], axis=1)
         else:
@@ -170,7 +184,10 @@ def train_constraint():
             # Create the model
         model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip,
                                     hyperparams, R)
-        model.to(device2)
+        model.to(device)
+        # Usa DDP
+        if num_gpus > 1:
+            model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         criterion = nn.BCELoss()
 

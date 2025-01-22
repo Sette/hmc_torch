@@ -45,7 +45,7 @@ sys.argv = [
 
 sys.argv = [
 'script.py',
-'--dataset', 'all',
+'--dataset', 'seq_GO', 'derisi_GO', 'gasch1_GO', 'cellcycle_FUN',
 '--dataset_path', '/home/bruno/storage/data/go_fun',
 '--batch_size', '32',
 '--lr', '1e-5',
