@@ -106,8 +106,11 @@ def train_constraint():
     print(f"Total de GPUs disponíveis: {num_gpus}")
     # Inicializa o processo
     if num_gpus > 1:
-        os.environ["RANK"] = "0"  # ID do processo (0 para o primeiro processo)
-        os.environ["WORLD_SIZE"] = str(num_gpus)  # Número total de GPUs
+        # Configura variáveis de ambiente necessárias para DistributedDataParallel
+        os.environ["MASTER_ADDR"] = "localhost"  # Ou o IP do nó mestre se for multi-nó
+        os.environ["MASTER_PORT"] = "29500"  # Pode escolher outra porta se necessário
+        os.environ["RANK"] = "0"  # Rank do processo principal
+        os.environ["WORLD_SIZE"] = str(num_gpus)  # Total de processos
 
         # Inicializa o processo distribuído
         dist.init_process_group(backend='nccl', rank=0, world_size=num_gpus)
