@@ -110,9 +110,7 @@ def train_constraint():
     if xm.xla_device() is not None:
         print(f"TPU disponível! Dispositivo: {xm.xla_device()}")
         device = xm.xla_device()
-    else:
-        print("Nenhuma TPU disponível.")
-    if num_gpus >= 1:
+    elif num_gpus >= 1:
         device = torch.device('cuda')
     elif num_gpus == 0:
         device = torch.device('cpu')
