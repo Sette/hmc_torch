@@ -106,7 +106,11 @@ def train_constraint():
     print(f"Total de GPUs disponíveis: {num_gpus}")
     # Inicializa o processo
     if num_gpus > 1:
-        dist.init_process_group(backend='nccl')
+        os.environ["RANK"] = "0"  # ID do processo (0 para o primeiro processo)
+        os.environ["WORLD_SIZE"] = str(num_gpus)  # Número total de GPUs
+
+        # Inicializa o processo distribuído
+        dist.init_process_group(backend='nccl', rank=0, world_size=num_gpus)
         
         # Obtém ID da GPU do processo atual
         local_rank = torch.distributed.get_rank()
