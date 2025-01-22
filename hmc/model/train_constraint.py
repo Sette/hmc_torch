@@ -105,10 +105,8 @@ def train_constraint():
     num_gpus = torch.cuda.device_count()
     print(f"Total de GPUs disponíveis: {num_gpus}")
     # Inicializa o processo
-    if num_gpus > 1:
-        device = torch.device(f'cuda:1')
-    elif num_gpus == 1:
-        device = torch.device(f'cuda:0')
+    if num_gpus >= 1:
+        device = torch.device('cuda')
     elif num_gpus == 0:
         device = torch.device('cpu')
         
