@@ -4,7 +4,8 @@ from hmc.dataset import initialize_dataset
 
 import os
 
-import torch.distributed as dist
+import torch_xla.core.xla_model as xm
+
 
 import argparse
 
@@ -105,6 +106,12 @@ def train_constraint():
     num_gpus = torch.cuda.device_count()
     print(f"Total de GPUs disponíveis: {num_gpus}")
     # Inicializa o processo
+    # Verifica se há TPU disponível
+    if xm.xla_device() is not None:
+        print(f"TPU disponível! Dispositivo: {xm.xla_device()}")
+        device = xm.xla_device()
+    else:
+        print("Nenhuma TPU disponível.")
     if num_gpus >= 1:
         device = torch.device('cuda')
     elif num_gpus == 0:
