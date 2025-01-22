@@ -106,19 +106,7 @@ def train_constraint():
     print(f"Total de GPUs disponíveis: {num_gpus}")
     # Inicializa o processo
     if num_gpus > 1:
-        # Configura variáveis de ambiente necessárias para DistributedDataParallel
-        os.environ["MASTER_ADDR"] = "localhost"  # Ou o IP do nó mestre se for multi-nó
-        os.environ["MASTER_PORT"] = "29500"  # Pode escolher outra porta se necessário
-        os.environ["RANK"] = "0"  # Rank do processo principal
-        os.environ["WORLD_SIZE"] = str(num_gpus)  # Total de processos
-
-        # Inicializa o processo distribuído
-        dist.init_process_group(backend='nccl', rank=0, world_size=num_gpus)
-        
-        # Obtém ID da GPU do processo atual
-        local_rank = torch.distributed.get_rank()
-        torch.cuda.set_device(local_rank)
-        device = torch.device(f'cuda:{local_rank}')
+        device = torch.device(f'cuda:1')
     elif num_gpus == 1:
         device = torch.device(f'cuda:0')
     elif num_gpus == 0:
@@ -194,7 +182,7 @@ def train_constraint():
         model.to(device)
         # Usa DDP
         if num_gpus > 1:
-            model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
+            model = nn.DataParallel(model)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         criterion = nn.BCELoss()
 
