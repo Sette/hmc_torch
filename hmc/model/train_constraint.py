@@ -1,31 +1,27 @@
 
 from hmc.model import ConstrainedFFNNModel, get_constr_out
 from hmc.dataset import initialize_dataset
-
 import os
-
+##Imports for use tpu and more then 1 gpu
 import torch_xla.core.xla_model as xm
-
-
+import torch.distributed as dist
 import argparse
 
 import torch
 import torch.utils.data
 import torch.nn as nn
-
 import random
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
-
-
 from sklearn.impute import SimpleImputer
-
 from sklearn import preprocessing
-
-
 from sklearn.metrics import average_precision_score
 # from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score, auc
+os.environ['MASTER_ADDR'] = 'localhost'
+os.environ['MASTER_PORT'] = '12355'
+os.environ['WORLD_SIZE'] = '2'  # Número total de GPUs
+os.environ['RANK'] = str(0)  # Rank atual da GPU
 
 
 def train_constraint():
@@ -183,9 +179,16 @@ def train_constraint():
         model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip,
                                     hyperparams, R)
         model.to(device)
-        # Usa DDP
+        # Usa DistributedDataParallel
         if num_gpus > 1:
-            model = nn.DataParallel(model)
+            # Inicializa o processo distribuído
+            dist.init_process_group(
+                backend='nccl',
+                init_method='env://',
+                world_size=int(os.environ['WORLD_SIZE']),
+                rank=int(os.environ['RANK'])
+            )
+            model = nn.parallel.DistributedDataParallel(model, device_ids=[x for x in range(num_gpus)])
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         criterion = nn.BCELoss()
 
