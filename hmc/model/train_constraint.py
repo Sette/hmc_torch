@@ -108,7 +108,7 @@ def train_constraint():
     if tpu_device == "xla:0":
         device = tpu_device
         print(f"Dispositivo TPU: {device}")
-    if num_gpus >= 1:
+    elif num_gpus >= 1:
         device = torch.device('cuda')
     elif num_gpus == 0:
         device = torch.device('cpu')
