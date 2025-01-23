@@ -2,14 +2,16 @@
 from hmc.model import ConstrainedFFNNModel, get_constr_out
 from hmc.dataset import initialize_dataset
 import os
-##Imports for use more than 1 gpu
+##Imports for use more than 1 gpu and TPU
 import torch.distributed as dist
-import argparse
+import torch_xla.core.xla_model as xm
+
 
 import torch
 import torch.utils.data
 import torch.nn as nn
 import random
+import argparse
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
@@ -100,8 +102,12 @@ def train_constraint():
     # Verifica quantas GPUs estão disponíveis
     num_gpus = torch.cuda.device_count()
     print(f"Total de GPUs disponíveis: {num_gpus}")
-    # Inicializa o processo
-    # Verifica se há TPU disponível
+
+    # Verificar disponibilidade de TPU
+    tpu_device = xm.xla_device()
+    if tpu_device == "xla:0":
+        device = tpu_device
+        print(f"Dispositivo TPU: {device}")
     if num_gpus >= 1:
         device = torch.device('cuda')
     elif num_gpus == 0:
@@ -209,6 +215,8 @@ def train_constraint():
                 # Clear gradients w.r.t. parameters
                 optimizer.zero_grad()
                 output = model(x.float())
+                if device == "xla:0":
+                    xm.mark_step()
 
                 constr_output = get_constr_out(output, R)
                 train_output = labels * output.double()
