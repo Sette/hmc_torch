@@ -19,6 +19,10 @@ from tqdm import tqdm
 from sklearn.impute import SimpleImputer
 from sklearn import preprocessing
 from sklearn.metrics import average_precision_score
+
+from hmc.model.model import ConstrainedMpFFNNModel
+
+
 # from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score, auc
 
 def setup(rank, world_size):
@@ -31,13 +35,13 @@ def setup(rank, world_size):
 def cleanup():
     dist.destroy_process_group()
 
-def run_train(train, world_size, datasets):
+def run_train(train, world_size, datasets, args):
     mp.spawn(train,
-             args=(world_size,datasets),
+             args=(world_size, datasets, args),
              nprocs=world_size,
              join=True)
 
-def train(rank, world_size, dataset_name):
+def train(rank, world_size, dataset_name, args):
     setup(rank, world_size)
     # Dictionaries with number of features and number of labels for each dataset
     input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'church': 27,
@@ -49,6 +53,10 @@ def train(rank, world_size, dataset_name):
                       'gasch2': 4128, 'hom': 4128, 'seq': 4130, 'spo': 4116}
     output_dims_others = {'diatoms': 398, 'enron': 56, 'imclef07a': 96, 'imclef07d': 46, 'reuters': 102}
     output_dims = {'FUN': output_dims_FUN, 'GO': output_dims_GO, 'others': output_dims_others}
+
+    hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,
+                   'non_lin': args.non_lin, 'hidden_dim': args.hidden_dim, 'lr': args.lr,
+                   'weight_decay': args.weight_decay}
 
     # setup mp_model and devices for this process
     dev0 = (rank * 2) % world_size
@@ -78,15 +86,15 @@ def train(rank, world_size, dataset_name):
     R = torch.tensor(R)
     # Transpose to get the ancestors for each node
     R = R.transpose(1, 0)
-    R = R.unsqueeze(0).to(device)
+    R = R.unsqueeze(0).to(rank)
 
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont,val.X_cont)))
     val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y).to(
-        device)
+        rank)
     train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
-        train.Y).to(device)
+        train.Y).to(rank)
     print(train.X_bin.shape)
     if train.X_bin.shape[0] > 0:
         train.X = np.concatenate([train.X_count, train.X_bin], axis=1)
@@ -95,8 +103,8 @@ def train(rank, world_size, dataset_name):
         train.X = train.X_count
         val.X = val.X_count
 
-    train.X = torch.tensor(train.X).to(device)
-    val.X = torch.tensor(val.X).to(device)
+    train.X = torch.tensor(train.X).to(rank)
+    val.X = torch.tensor(val.X).to(rank)
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
@@ -118,20 +126,10 @@ def train(rank, world_size, dataset_name):
         num_to_skip = 1
 
         # Create the model
-    model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip,
-                                hyperparams, R)
-    model.to(device)
-    # Usa DistributedDataParallel
-    if num_gpus > 1:
-        # Inicializa o processo distribuído
-        dist.init_process_group(
-            backend='nccl',
-            init_method='env://',
-            world_size=int(os.environ['WORLD_SIZE']),
-            rank=int(os.environ['RANK'])
-        )
-        model = nn.parallel.DistributedDataParallel(model, device_ids=[x for x in range(num_gpus)])
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    model = ConstrainedMpFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip, hyperparams, R, dev0, dev1)
+    ddp_mp_model = DDP(model)
+
+    optimizer = torch.optim.Adam(ddp_mp_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.BCELoss()
 
     # Set patience
@@ -149,12 +147,12 @@ def train(rank, world_size, dataset_name):
         train_score = 0
 
         for i, (x, labels) in enumerate(train_loader):
-            x = x.to(device)
-            labels = labels.to(device)
+            x = x.to(rank)
+            labels = labels.to(dev1)
 
             # Clear gradients w.r.t. parameters
             optimizer.zero_grad()
-            output = model(x.float())
+            output = ddp_mp_model(x.float())
 
             constr_output = get_constr_out(output, R)
             train_output = labels * output.double()
@@ -179,8 +177,8 @@ def train(rank, world_size, dataset_name):
                                             average='micro')
 
         for i, (x, y) in enumerate(val_loader):
-            x = x.to(device)
-            y = y.to(device)
+            x = x.to(rank)
+            y = y.to(rank)
 
             constrained_output = model(x.float())
             predicted = constrained_output.data > 0.5
@@ -221,7 +219,7 @@ def train(rank, world_size, dataset_name):
         if patience == 0:
             break
 
-def run():
+def run_constraint():
     # Training settings
     parser = argparse.ArgumentParser(description='Train neural network')
 
@@ -255,13 +253,6 @@ def run():
                         help='random seed (default:0)')
     
     args = parser.parse_args()
-    hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,
-                   'non_lin': args.non_lin, 'hidden_dim': args.hidden_dim, 'lr': args.lr,
-                   'weight_decay': args.weight_decay}
-    ## Insert her a logic to use all datasets with arguments
-    
-    print(type(args.dataset))
-    
     if 'all' in args.dataset:
         datasets = ['cellcycle_GO', 'derisi_GO', 'eisen_GO', 'expr_GO', 'gasch1_GO',
                     'gasch2_GO', 'seq_GO', 'spo_GO', 'cellcycle_FUN', 'derisi_FUN', 
@@ -281,6 +272,7 @@ def run():
     world_size = num_gpus
 
     for dataset_name in datasets:
-        run_train(train, world_size, dataset_name)
+        if world_size > 1:
+            run_train(train, world_size, dataset_name, args)
         cleanup()
 

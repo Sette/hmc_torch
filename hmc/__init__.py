@@ -1,2 +1,2 @@
 from hmc.model.train import train
-from hmc.model.train_constraint import train_constraint
+from hmc.model.train_constraint import run_constraint
