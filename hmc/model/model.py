@@ -138,13 +138,21 @@ class HMCLocalClassificationModel(nn.Module):
         return predictions
     
 
-def get_constr_out(x, R):
+def get_constr_out(x, R, device=None):
     """
     Given the network output x and a constraint matrix R, 
     returns the modified output according to the hierarchical constraints in R.
     """
+    # Determine the device to use
+    if device is None:
+        device = x.device
+
     # Convert x to double precision
     c_out = x.double()
+
+    # Move both tensors to the same device
+    x = x.to(device)
+    R = R.to(device)
     
     # Add a dimension to c_out: from (N, D) to (N, 1, D)
     # N: batch size, D: dimensionality of the output
