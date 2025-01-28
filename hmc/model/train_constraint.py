@@ -128,6 +128,7 @@ def train(rank, world_size, dataset_name, args):
         # Create the model
     model = ConstrainedMpFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip, hyperparams, R, dev0, dev1)
     ddp_mp_model = DDP(model)
+    ddp_mp_model.to(rank)
 
     optimizer = torch.optim.Adam(ddp_mp_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.BCELoss()
@@ -171,10 +172,10 @@ def train(rank, world_size, dataset_name, args):
             optimizer.step()
 
         model.eval()
-        constr_output = constr_output.to('cpu')
-        labels = labels.to('cpu')
-        train_score = average_precision_score(labels, constr_output.data,
-                                            average='micro')
+        #constr_output = constr_output.to('cpu')
+        #labels = labels.to('cpu')
+        #train_score = average_precision_score(labels, constr_output.data,
+        #                                    average='micro')
 
         for i, (x, y) in enumerate(val_loader):
             x = x.to(rank)
