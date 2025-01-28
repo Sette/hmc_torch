@@ -159,6 +159,8 @@ def train(rank, world_size, dataset_name, args):
             output = output.to(device)
             train_output = labels * output.double()
             train_output = get_constr_out(train_output, R)
+            constr_output = constr_output.to(device)
+            train_output - train_output.to(device)
             train_output = (1 - labels) * constr_output.double() + labels * train_output
             loss = criterion(train_output, labels)
             predicted = constr_output.data > 0.5
