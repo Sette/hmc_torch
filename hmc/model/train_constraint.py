@@ -155,6 +155,8 @@ def train(rank, world_size, dataset_name, args):
             output = ddp_mp_model(x.float())
 
             constr_output = get_constr_out(output, R)
+            device = labels.device
+            output = output.to(device)
             train_output = labels * output.double()
             train_output = get_constr_out(train_output, R)
             train_output = (1 - labels) * constr_output.double() + labels * train_output
