@@ -92,9 +92,9 @@ def train(rank, world_size, dataset_name, args):
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont,val.X_cont)))
     val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y).to(
-        rank)
+        dev0)
     train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
-        train.Y).to(rank)
+        train.Y).to(dev0)
     print(train.X_bin.shape)
     if train.X_bin.shape[0] > 0:
         train.X = np.concatenate([train.X_count, train.X_bin], axis=1)
@@ -103,8 +103,8 @@ def train(rank, world_size, dataset_name, args):
         train.X = train.X_count
         val.X = val.X_count
 
-    train.X = torch.tensor(train.X).to(rank)
-    val.X = torch.tensor(val.X).to(rank)
+    train.X = torch.tensor(train.X).to(dev0)
+    val.X = torch.tensor(val.X).to(dev0)
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
