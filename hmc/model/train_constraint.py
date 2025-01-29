@@ -147,8 +147,8 @@ def train(rank, world_size, dataset_name, args):
         train_score = 0
 
         for i, (x, labels) in enumerate(train_loader):
-            x = x.to(rank)
-            labels = labels.to(rank)
+            x = x.to(dev1)
+            labels = labels.to(dev0)
 
             # Clear gradients w.r.t. parameters
             optimizer.zero_grad()
