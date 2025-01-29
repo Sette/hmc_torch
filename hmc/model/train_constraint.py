@@ -390,6 +390,7 @@ def train_model(rank, world_size, dataset_name, args):
         floss.close()
 
         if patience == 0:
+            cleanup()
             break
 
 def run_constraint():
