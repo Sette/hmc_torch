@@ -160,6 +160,7 @@ def train(rank, world_size, dataset_name, args):
                 device = 'cuda:1'
             elif device == 'cuda:1':
                 device = 'cuda:0'
+            labels = labels.to(device)
             output = output.to(device)
             train_output = labels * output.double()
             train_output = get_constr_out(train_output, R)
