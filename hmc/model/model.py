@@ -208,6 +208,7 @@ class ConstrainedMpFFNNModel(nn.Module):
                 dev0 = False
             else:
                 x = x.to(self.dev1)
+                dev0 = True
             if i == self.nb_layers - 1:
                 x = self.sigmoid(self.fc[i](x))
             else:
