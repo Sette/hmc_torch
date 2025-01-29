@@ -446,6 +446,6 @@ def run_constraint():
 
     for dataset_name in datasets:
         if world_size > 1:
-            run_train(train_model(), world_size, dataset_name, args)
+            run_train(train_model, world_size, dataset_name, args)
         cleanup()
 
