@@ -152,7 +152,8 @@ def train(rank, world_size, dataset_name, args):
 
             # Clear gradients w.r.t. parameters
             optimizer.zero_grad()
-            output = ddp_mp_model(x.float())
+            model_device = ddp_mp_model.device
+            output = ddp_mp_model(x.float().to(model_device))
 
             constr_output = get_constr_out(output, R)
             device = labels.device
