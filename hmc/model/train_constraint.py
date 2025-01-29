@@ -155,12 +155,16 @@ def train(rank, world_size, dataset_name, args):
             output = ddp_mp_model(x.float())
 
             constr_output = get_constr_out(output, R)
-            #device = labels.device
-            output = output.to(rank)
+            device = labels.device
+            if device == 'cuda:0':
+                device = 'cuda:1'
+            elif device == 'cuda:1':
+                device = 'cuda:0'
+            output = output.to(device)
             train_output = labels * output.double()
             train_output = get_constr_out(train_output, R)
-            constr_output = constr_output.to(rank)
-            train_output - train_output.to(rank)
+            constr_output = constr_output.to(device)
+            train_output - train_output.to(device)
             train_output = (1 - labels) * constr_output.double() + labels * train_output
             loss = criterion(train_output, labels)
             predicted = constr_output.data > 0.5
