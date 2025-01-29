@@ -183,13 +183,20 @@ class ConstrainedMpFFNNModel(nn.Module):
         self.R = R
 
         fc = []
+        isdev0 = True
         for i in range(self.nb_layers):
-            if i == 0:
-                fc.append(nn.Linear(input_dim, hidden_dim).to(dev1))
-            elif i == self.nb_layers - 1:
-                fc.append(nn.Linear(hidden_dim, output_dim).to(dev0))
+            if isdev0:
+                device = dev0
+                isdev0 = False
             else:
-                fc.append(nn.Linear(hidden_dim, hidden_dim).to(dev1))
+                device = dev1
+                isdev0 = True
+            if i == 0:
+                fc.append(nn.Linear(input_dim, hidden_dim).to(device))
+            elif i == self.nb_layers - 1:
+                fc.append(nn.Linear(hidden_dim, output_dim).to(device))
+            else:
+                fc.append(nn.Linear(hidden_dim, hidden_dim).to(device))
         self.fc = nn.ModuleList(fc)
 
         self.drop = nn.Dropout(hyperparams['dropout'])
