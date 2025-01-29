@@ -208,14 +208,14 @@ class ConstrainedMpFFNNModel(nn.Module):
             self.f = nn.ReLU()
 
     def forward(self, x):
-        dev0 = True
+        isdev0 = True
         for i in range(self.nb_layers):
-            if dev0 == True:
+            if isdev0:
                 x = x.to(self.dev0)
-                dev0 = False
+                isdev0 = False
             else:
                 x = x.to(self.dev1)
-                dev0 = True
+                isdev0 = True
             if i == self.nb_layers - 1:
                 x = self.sigmoid(self.fc[i](x))
             else:
