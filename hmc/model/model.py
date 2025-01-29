@@ -189,7 +189,7 @@ class ConstrainedMpFFNNModel(nn.Module):
             elif i == self.nb_layers - 1:
                 fc.append(nn.Linear(hidden_dim, output_dim).to(dev1))
             else:
-                fc.append(nn.Linear(hidden_dim, hidden_dim).to(dev0))
+                fc.append(nn.Linear(hidden_dim, hidden_dim).to(dev1))
         self.fc = nn.ModuleList(fc)
 
         self.drop = nn.Dropout(hyperparams['dropout'])
