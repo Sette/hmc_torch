@@ -185,9 +185,9 @@ class ConstrainedMpFFNNModel(nn.Module):
         fc = []
         for i in range(self.nb_layers):
             if i == 0:
-                fc.append(nn.Linear(input_dim, hidden_dim).to(dev0))
+                fc.append(nn.Linear(input_dim, hidden_dim).to(dev1))
             elif i == self.nb_layers - 1:
-                fc.append(nn.Linear(hidden_dim, output_dim).to(dev1))
+                fc.append(nn.Linear(hidden_dim, output_dim).to(dev0))
             else:
                 fc.append(nn.Linear(hidden_dim, hidden_dim).to(dev1))
         self.fc = nn.ModuleList(fc)
