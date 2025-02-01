@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
+from sklearn.impute import SimpleImputer
+from sklearn import preprocessing
 
 BUFFER_SIZE = 10
 
@@ -308,7 +310,32 @@ class GOFUNDataset:
         self.transform_features()
         self.transform_labels()
 
+    def compute_matrix_R(self):
+        # Compute matrix of ancestors R
+        # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
+        R = np.zeros(self.A.shape)
+        np.fill_diagonal(R, 1)
+        g = nx.DiGraph(self.A)
+        for i in range(len(self.A)):
+            descendants = list(nx.descendants(g, i))
+            if descendants:
+                R[i, descendants] = 1
+        R = torch.tensor(R)
+        # Transpose to get the ancestors for each node
+        R = R.transpose(1, 0)
+        self.R = R.unsqueeze(0)
 
+
+
+def impute_scaler(train, val, device='cuda'):
+    scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont, val.X_cont)))
+    val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y).to(
+        device)
+    train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
+        train.Y).to(device)
+
+    return train, val
 
 def initialize_dataset(name, dataset_path, output_path, is_go=False):
     """
