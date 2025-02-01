@@ -1,11 +1,7 @@
 
 from hmc.model import ConstrainedFFNNModel, get_constr_out
-from hmc.dataset import initialize_dataset
+from hmc.dataset import initialize_dataset, impute_scaler
 import os
-##Imports for use more than 1 gpu and TPU
-import torch.distributed as dist
-import torch_xla.core.xla_model as xm
-
 
 import torch
 import torch.utils.data
@@ -13,16 +9,10 @@ import torch.nn as nn
 import random
 import argparse
 import numpy as np
-import networkx as nx
+
 from tqdm import tqdm
-from sklearn.impute import SimpleImputer
-from sklearn import preprocessing
 from sklearn.metrics import average_precision_score
 # from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score, auc
-os.environ['MASTER_ADDR'] = 'localhost'
-os.environ['MASTER_PORT'] = '12355'
-os.environ['WORLD_SIZE'] = '2'  # Número total de GPUs
-os.environ['RANK'] = str(0)  # Rank atual da GPU
 
 
 def train_constraint():
@@ -103,12 +93,7 @@ def train_constraint():
     num_gpus = torch.cuda.device_count()
     print(f"Total de GPUs disponíveis: {num_gpus}")
 
-    # Verificar disponibilidade de TPU
-    tpu_device = xm.xla_device()
-    if tpu_device == "xla:0":
-        device = tpu_device
-        print(f"Dispositivo TPU: {device}")
-    elif num_gpus >= 1:
+    if num_gpus > 0:
         device = torch.device('cuda')
     elif num_gpus == 0:
         device = torch.device('cpu')
@@ -124,29 +109,10 @@ def train_constraint():
         train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(
             val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
 
-        different_from_0 = torch.tensor(np.array((test.Y.sum(0) != 0), dtype=np.uint8), dtype=torch.uint8)
+        R = train.compute_matrix_R().to(device)
 
-        # Compute matrix of ancestors R
-        # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        R = np.zeros(train.A.shape)
-        np.fill_diagonal(R, 1)
-        g = nx.DiGraph(train.A)
-        for i in range(len(train.A)):
-            descendants = list(nx.descendants(g, i))
-            if descendants:
-                R[i, descendants] = 1
-        R = torch.tensor(R)
-        # Transpose to get the ancestors for each node
-        R = R.transpose(1, 0)
-        R = R.unsqueeze(0).to(device)
+        train, val = impute_scaler(train, val, device=device)
 
-
-        scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
-        imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont,val.X_cont)))
-        val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y).to(
-            device)
-        train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
-            train.Y).to(device)
         print(train.X_bin.shape)
         if train.X_bin.shape[0] > 0:
             train.X = np.concatenate([train.X_count, train.X_bin], axis=1)
@@ -181,16 +147,7 @@ def train_constraint():
         model = ConstrainedFFNNModel(input_dims[data], args.hidden_dim, output_dims[ontology][data] + num_to_skip,
                                     hyperparams, R)
         model.to(device)
-        # Usa DistributedDataParallel
-        if num_gpus > 1:
-            # Inicializa o processo distribuído
-            dist.init_process_group(
-                backend='nccl',
-                init_method='env://',
-                world_size=int(os.environ['WORLD_SIZE']),
-                rank=int(os.environ['RANK'])
-            )
-            model = nn.parallel.DistributedDataParallel(model, device_ids=[x for x in range(num_gpus)])
+
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         criterion = nn.BCELoss()
 
@@ -215,8 +172,6 @@ def train_constraint():
                 # Clear gradients w.r.t. parameters
                 optimizer.zero_grad()
                 output = model(x.float())
-                if device == "xla:0":
-                    xm.mark_step()
 
                 constr_output = get_constr_out(output, R)
                 train_output = labels * output.double()
