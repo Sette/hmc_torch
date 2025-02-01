@@ -19,7 +19,7 @@ def convert_to_list_of_arrays(val):
     # Converte cada item da lista para um array NumPy
     return [np.array(item) for item in list_str]
 
-class HMCDataset(Dataset):
+class HMCDataset_old(Dataset):
     def __init__(self, files, levels_size, testset=False):
         self.files = files
         self.levels_size = levels_size
@@ -208,7 +208,7 @@ def load_dataset_paths(fun_path, go_path):
     return datasets
 
 
-class GOFUNDataset:
+class HMCDataset:
     def __init__(self, csv_file, labels_json, output_path = 'data', is_go=False):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
@@ -325,6 +325,121 @@ class GOFUNDataset:
         R = R.transpose(1, 0)
         self.R = R.unsqueeze(0)
 
+
+class GOFUNDataset:
+    def __init__(self, csv_file, labels_json, output_path='data', is_go=False):
+        """
+        Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
+        """
+        self.g = None
+        self.nodes_idx = None
+        self.g_t = None
+        self.df = None
+        self.X_cont = []
+        labels_json_name = labels_json.split('/')[-1]
+        self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
+        self.columns_path = labels_json.replace('-labels', '')
+        self.load_structure(labels_json, is_go)
+        with open(self.columns_path, 'r') as f:
+            self.columns = json.load(f)
+
+        self.load_data(
+            csv_file
+        )
+        self.to_eval = [t not in to_skip for t in self.categories['labels']]
+
+    def load_structure(self, labels_json, is_go):
+        # Load labels JSON
+        with open(labels_json, 'r') as f:
+            self.categories = json.load(f)
+
+        self.g = nx.DiGraph()
+
+        for cat in self.categories['labels']:
+            terms = cat.split('.')
+            if is_go:
+                self.g.add_edge(terms[1], terms[0])
+            else:
+                if len(terms) == 1:
+                    self.g.add_edge(terms[0], 'root')
+                else:
+                    for i in range(2, len(terms) + 1):
+                        self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
+
+        ### Save networkx graph
+        # Para salvar em formato GraphML
+        nx.write_graphml(self.g, self.graph_path)
+
+        self.nodes = sorted(self.g.nodes(),
+                            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (
+                            len(x.split('.')), x)
+                            )
+        self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
+        self.g_t = self.g.reverse()
+        self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
+
+    def transform_labels(self):
+        self.Y = []
+        y_ = np.zeros(len(self.nodes))
+        for labels in self.df.categories.values:
+            for t in labels.split('@'):
+                y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
+                y_[self.nodes_idx[t]] = 1
+            self.Y.append(y_)
+        self.Y = np.stack(self.Y)
+
+    def parse_features(self):
+        self.X_cont = []
+        self.X_bin = []
+        for features in self.features:
+            cont_features = []
+            bin_features = []
+            for feature in features:
+                # Se 'item' for uma lista, consideramos como binária
+                if isinstance(feature, list):
+                    # Achatar (flatten) essa sublista e colocar na bin_features
+                    for f in feature:
+                        bin_features.append(f)
+                else:
+                    # Se for float ou int, consideramos feature contínua
+                    if feature is None or feature == 'None' or feature == 'nan' or feature == 'NaN' or type(
+                            feature) is None:
+                        cont_features.append(np.nan)
+                    else:
+                        cont_features.append(feature)
+            self.X_cont.append(cont_features)
+            self.X_bin.append(bin_features)
+
+        self.X_cont = np.array(self.X_cont, dtype=float)
+        self.X_bin = np.array(self.X_bin, dtype=int)
+
+    def transform_features(self):
+        self.features = self.df.features.apply(lambda x: ast.literal_eval(x)).tolist()
+        self.parse_features()
+
+    def load_data(self, csv_file):
+        """
+        Load features and labels from CSV, and optionally a hierarchy graph from JSON.
+        """
+        # Load CSV
+        self.df = pd.read_csv(csv_file)
+        self.transform_features()
+        self.transform_labels()
+
+    def compute_matrix_R(self):
+        # Compute matrix of ancestors R
+        # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
+        R = np.zeros(self.A.shape)
+        np.fill_diagonal(R, 1)
+        g = nx.DiGraph(self.A)
+        for i in range(len(self.A)):
+            descendants = list(nx.descendants(g, i))
+            if descendants:
+                R[i, descendants] = 1
+        R = torch.tensor(R)
+        # Transpose to get the ancestors for each node
+        R = R.transpose(1, 0)
+        self.R = R.unsqueeze(0)
 
 
 def impute_scaler(train, val, device='cuda'):
