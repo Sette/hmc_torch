@@ -7,11 +7,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-setuptools = ">=70.0.0"
 tqdm = ">=4.66.4"
 numpy = ">=1.25.0"
 pandas = ">=1.5.0"
-pydot = ">=1.2.0"
 dataset = ">=1.6.2"
 scikit-learn = ">=1.2.2"
 torch = { version = ">=2.0.0", source = "pytorch" }
@@ -22,6 +20,10 @@ torchaudio = { version = ">=2.0.0", source = "pytorch" }
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu121"
 priority = "supplemental"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]

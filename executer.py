@@ -1,17 +1,20 @@
 # %%
 import os
 import pandas as pd
+import sys
+from datetime import UTC
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
-from hmc.model.train import run
+from hmc.model.train import train
+from hmc.model import train_constraint
 
 # %%
-base_path = "/mnt/disks/data/fma/trains"
+base_path = "/home/bruno/storage/data/fma/trains"
 id = "hierarchical_tworoots"
 
 
 # %%
-train_path = os.path.join(base_path,id)
+train_path = os.path.join(base_path, id)
 torch_path = os.path.join(train_path,'torch')
 metadata_path = os.path.join(train_path,"metadata.json")
 labels_path = os.path.join(train_path,"labels.json")
@@ -27,32 +30,44 @@ print(f"Job ID: {job_id}")
 model_path = os.path.join(hmc_path, job_id)
 create_dir(model_path)
 
+'''
+sys.argv = [
+'script.py',
+'--input_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
+'--output_path', '/home/bruno/storage/data/fma/trains/rock_electronic',
+'--batch_size', '64',
+'--epochs', '100',
+'--thresholds', '0.5', '0.5', '0.5', '0.5',
+'--dropouts', '0.3', '0.3', '0.3', '0.3',
+'--patience', '2'
+]
+'''
 
-args = pd.Series({
-    "batch_size":64,
-    "epochs":15,
-    "dropout":0.1,
-    'patience':5,
-    'shuffle':True,
-    'max_queue_size':64,
-    "labels_path": labels_path,
-    "metadata_path": metadata_path,
-    "model_path": model_path,
-    "train_path": os.path.join(torch_path,'train'),
-    "test_path": os.path.join(torch_path,'test'),
-    "val_path": os.path.join(torch_path,'val')
-})
-
+sys.argv = [
+'script.py',
+'--dataset', 'seq_GO', 'derisi_GO', 'gasch1_GO', 'cellcycle_FUN',
+'--dataset_path', '/home/bruno/storage/data/go_fun',
+'--batch_size', '32',
+'--lr', '1e-5',
+'--dropout', '0.7',
+'--hidden_dim', '50',
+'--num_layers', '2',
+'--weight_decay', '1e-5',
+'--non_lin', 'relu',
+'--device', '0',
+'--num_epochs', '2000',
+'--seed', '0',
+'--output_path', '/home/bruno/storage/models/gofun'
+]
 
 # %%
-
-time_start = dt.utcnow()
-print("[{}] Experiment started at {}".format(id, time_start.strftime("%H:%M:%S")))
+# Salvar os argumentos atuais
+time_start = dt.now(UTC)
+print("Experiment started at {}".format(time_start.strftime("%H:%M:%S")))
 print(".......................................")
-print(args)
-run(args)
-time_end = dt.utcnow()
+df_predict = train_constraint()
+time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
-print("[{}] Experiment finished at {} / elapsed time {}s".format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
+print("Experiment finished at {} / elapsed time {}s".format(time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
 
