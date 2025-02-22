@@ -9,6 +9,19 @@ import networkx as nx
 
 from sklearn.impute import SimpleImputer
 from sklearn import preprocessing
+import logging
+
+# Configurar o logger
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+
+# Criar um logger
+logger = logging.getLogger(__name__)
+
+
+
 
 BUFFER_SIZE = 10
 
@@ -89,7 +102,11 @@ def load_json(file_path):
         return None
 
 
-def load_dataset_paths(fun_path, go_path):
+def load_dataset_paths(dataset_path):
+    go_path = os.path.join(dataset_path, 'gene-ontology-annotated-datasets')
+    fun_path = os.path.join(dataset_path, 'funcat-annotated-datasets')
+    fma_path = os.path.join(dataset_path, 'fma_rock_electronic')
+
     datasets = {
         'cellcycle_FUN': (
             fun_path + '/cellcycle_FUN.train.csv',
@@ -203,27 +220,44 @@ def load_dataset_paths(fun_path, go_path):
             go_path + '/spo_GO-labels.json',
             go_path + '/spo_GO.json'
         ),
+        'fma_rock_electronic': (
+            fma_path + '/train.csv',
+            fma_path + '/valid.csv',
+            fma_path + '/test.csv',
+            fma_path + '/labels.json',
+            fma_path + '/metadata.json'
+        ),
     }
     
     return datasets
 
 
 class HMCDataset:
-    def __init__(self, csv_file, labels_json, output_path = 'data', is_go=False):
+    def __init__(self, csv_file, labels_json, output_path = 'data'):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
         self.g = None
+        self.is_go = False
+        self.is_fma = False
         self.nodes_idx = None
+        self.categories = None
+        self.nodes = None
         self.g_t = None
         self.df = None
+        self.A = None
+        self.max_len = 0
         self.X_cont = []
+        self.Y = []
         labels_json_name = labels_json.split('/')[-1]
         self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
-        self.columns_path = labels_json.replace('-labels', '')
-        self.load_structure(labels_json, is_go)
-        with open(self.columns_path, 'r') as f:
-            self.columns = json.load(f)
+
+        if 'GO' in csv_file:
+            self.is_go = True
+        if 'fma' in csv_file:
+            self.is_fma = True
+
+        self.load_structure(labels_json)
 
         self.load_data(
             csv_file
@@ -231,40 +265,58 @@ class HMCDataset:
         self.to_eval = [t not in to_skip for t in self.categories['labels']]
 
 
-    def load_structure(self, labels_json, is_go):
+    def load_structure(self, labels_json):
         # Load labels JSON
         with open(labels_json, 'r') as f:
             self.categories = json.load(f)
 
         self.g = nx.DiGraph()
-
         for cat in self.categories['labels']:
             terms = cat.split('.')
-            if is_go:
+
+            cat_len = len(terms)
+            logger.info(f'Category: {cat} - Length: {cat_len}')
+            if cat_len > self.max_len:
+                self.max_len = cat_len
+                logger.info(f'New max length: {self.max_len}')
+
+            if self.is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
                 if len(terms) == 1:
-                    self.g.add_edge(terms[0], 'root')
+                    logger.info(f'Adding a root node: {terms[0]}')
+                    self.g.add_node(terms[0])
                 else:
+                    logger.info(f'Adding edge: {".".join(terms[:2])} -> {".".join(terms[:1])}')
                     for i in range(2, len(terms) + 1):
                         self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
 
+            self.nodes = sorted(self.g.nodes(), key=lambda x: (len(x.split('.')), x))
+            self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
+            self.g_t = self.g.reverse()
 
         ### Save networkx graph
         # Para salvar em formato GraphML
         nx.write_graphml(self.g, self.graph_path)
 
-        self.nodes = sorted(self.g.nodes(),
-            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (len(x.split('.')), x)
-        )
-        self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
-        self.g_t = self.g.reverse()
-        self.A =  nx.to_numpy_array(self.g, nodelist=self.nodes)
+        self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
+
+    def get_hierarchy_levels(self):
+        """
+        Retorna um dicionário com os nós agrupados por nível na hierarquia.
+        """
+        levels = {}
+        for node in self.g.nodes():
+            depth = len(node.split('.'))
+            if depth not in levels:
+                levels[depth] = []
+            levels[depth].append(node)
+        return levels
+
 
     def transform_labels(self):
-        self.Y = []
-        y_ = np.zeros(len(self.nodes))
         for labels in self.df.categories.values:
+            y_ = np.zeros(len(self.nodes))
             for t in labels.split('@'):
                 y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
                 y_[self.nodes_idx[t]] = 1
@@ -298,16 +350,19 @@ class HMCDataset:
 
     def transform_features(self):
         self.features = self.df.features.apply(lambda x : ast.literal_eval(x)).tolist()
-        self.parse_features()
 
 
     def load_data(self, csv_file):
         """
         Load features and labels from CSV, and optionally a hierarchy graph from JSON.
         """
-        # Load CSV
-        self.df = pd.read_csv(csv_file)
-        self.transform_features()
+        if self.is_fma:
+            # Load CSV for fma
+            self.df = pd.read_csv(csv_file, delimiter="|")
+        else:
+            # Load CSV for others
+            self.df = pd.read_csv(csv_file)
+            self.transform_features()
         self.transform_labels()
 
     def compute_matrix_R(self):
@@ -326,8 +381,15 @@ class HMCDataset:
         self.R = R.unsqueeze(0)
 
 
+
+
+
+
+
+##### OLD
+
 class GOFUNDataset:
-    def __init__(self, csv_file, labels_json, output_path='data', is_go=False):
+    def __init__(self, csv_file, labels_json, output_path='data'):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
@@ -336,10 +398,15 @@ class GOFUNDataset:
         self.g_t = None
         self.df = None
         self.X_cont = []
+        self.is_go = False
+        self.is_fma = False
+        if 'GO' in csv_file:
+            self.is_go = True
+
         labels_json_name = labels_json.split('/')[-1]
         self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
         self.columns_path = labels_json.replace('-labels', '')
-        self.load_structure(labels_json, is_go)
+        self.load_structure(labels_json)
         with open(self.columns_path, 'r') as f:
             self.columns = json.load(f)
 
@@ -348,7 +415,7 @@ class GOFUNDataset:
         )
         self.to_eval = [t not in to_skip for t in self.categories['labels']]
 
-    def load_structure(self, labels_json, is_go):
+    def load_structure(self, labels_json):
         # Load labels JSON
         with open(labels_json, 'r') as f:
             self.categories = json.load(f)
@@ -357,7 +424,7 @@ class GOFUNDataset:
 
         for cat in self.categories['labels']:
             terms = cat.split('.')
-            if is_go:
+            if self.is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
                 if len(terms) == 1:
@@ -371,7 +438,7 @@ class GOFUNDataset:
         nx.write_graphml(self.g, self.graph_path)
 
         self.nodes = sorted(self.g.nodes(),
-                            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if is_go else (
+                            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if self.is_go else (
                             len(x.split('.')), x)
                             )
         self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
@@ -452,19 +519,15 @@ def impute_scaler(train, val, device='cuda'):
 
     return train, val
 
-def initialize_dataset(name, dataset_path, output_path, is_go=False):
+def initialize_dataset(name, dataset_path, output_path):
     """
     Initialize train, validation, and test datasets.
     """
-    go_path = os.path.join(dataset_path, 'gene-ontology-annotated-datasets' )
-    fun_path = os.path.join(dataset_path, 'funcat-annotated-datasets')
-    datasets = load_dataset_paths(fun_path, go_path)
+    datasets = load_dataset_paths(dataset_path)
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
-    if 'FUN' in name:
-        is_go = False
-    else:
-        is_go = True
-    train_data = GOFUNDataset(train_csv, labels_json, output_path, is_go)
-    val_data = GOFUNDataset(valid_csv, labels_json, output_path, is_go)
-    test_data = GOFUNDataset(test_csv, labels_json, output_path, is_go)
+
+
+    train_data = HMCDataset(train_csv, labels_json, output_path)
+    val_data = HMCDataset(valid_csv, labels_json, output_path)
+    test_data = HMCDataset(test_csv, labels_json, output_path)
     return train_data, val_data, test_data
