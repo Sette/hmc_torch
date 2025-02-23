@@ -1,1 +1,1 @@
-from hmc.dataset.dataset import GOFUNDataset, HMCDataset, initialize_dataset, impute_scaler
+from hmc.dataset.dataset import  HMCDataset, initialize_dataset, impute_scaler

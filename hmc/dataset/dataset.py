@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
+from tqdm.notebook import tqdm
+
 from sklearn.impute import SimpleImputer
 from sklearn import preprocessing
 import logging
@@ -19,8 +21,6 @@ logging.basicConfig(
 
 # Criar um logger
 logger = logging.getLogger(__name__)
-
-
 
 
 BUFFER_SIZE = 10
@@ -232,8 +232,9 @@ def load_dataset_paths(dataset_path):
     return datasets
 
 
+
 class HMCDataset:
-    def __init__(self, csv_file, labels_json, output_path = 'data'):
+    def __init__(self, csv_file, labels_json, is_local=False, is_global=False , output_path = 'data'):
         """
         Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
         """
@@ -241,14 +242,20 @@ class HMCDataset:
         self.is_go = False
         self.is_fma = False
         self.nodes_idx = None
+        self.local_nodes_idx = None
         self.categories = None
         self.nodes = None
         self.g_t = None
         self.df = None
         self.A = None
+        self.levels_size = None
+        self.is_local = is_local
+        self.is_global = is_global
         self.max_len = 0
         self.X_cont = []
         self.Y = []
+        self.Y_local = []
+        self.roots = []
         labels_json_name = labels_json.split('/')[-1]
         self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
 
@@ -271,57 +278,115 @@ class HMCDataset:
             self.categories = json.load(f)
 
         self.g = nx.DiGraph()
-        for cat in self.categories['labels']:
+        for cat in tqdm(self.categories['labels']):
             terms = cat.split('.')
-
-            cat_len = len(terms)
-            logger.info(f'Category: {cat} - Length: {cat_len}')
-            if cat_len > self.max_len:
-                self.max_len = cat_len
-                logger.info(f'New max length: {self.max_len}')
 
             if self.is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
                 if len(terms) == 1:
-                    logger.info(f'Adding a root node: {terms[0]}')
                     self.g.add_node(terms[0])
+                    self.roots.append(terms[0])
                 else:
-                    logger.info(f'Adding edge: {".".join(terms[:2])} -> {".".join(terms[:1])}')
                     for i in range(2, len(terms) + 1):
                         self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
 
-            self.nodes = sorted(self.g.nodes(), key=lambda x: (len(x.split('.')), x))
-            self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
-            self.g_t = self.g.reverse()
+        logger.info(f'Terminou: {self.max_len}')
+        self.nodes = sorted(self.g.nodes(), key=lambda x: (len(x.split('.')), x))
+        self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
+        self.g_t = self.g.reverse()
 
         ### Save networkx graph
         # Para salvar em formato GraphML
         nx.write_graphml(self.g, self.graph_path)
 
         self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
+        self.get_hierarchy_levels()
 
     def get_hierarchy_levels(self):
         """
         Retorna um dicionário com os nós agrupados por nível na hierarquia.
         """
-        levels = {}
+        self.levels = {}
+        self.levels_size = {}
+        self.local_nodes_idx = {}
+
         for node in self.g.nodes():
             depth = len(node.split('.'))
-            if depth not in levels:
-                levels[depth] = []
-            levels[depth].append(node)
-        return levels
+            if depth not in self.levels:
+                self.levels[depth] = []
+            self.levels[depth].append(node)
+        self.levels = {key: self.levels[key] for key in sorted(self.levels.keys())}
+        self.levels_size = {key: len(value) for key, value in self.levels.items()}
+        self.local_nodes_idx = {idx: dict(zip(level_nodes, range(len(level_nodes)))) for idx, level_nodes in
+                                self.levels.items()}
 
+    def get_hierarchy_levels(self):
+        """
+        Retorna um dicionário com os nós agrupados por nível na hierarquia.
+        O nível é inferido com base na profundidade relativa dos nós.
+        """
+        self.levels = {}
+        self.levels_size = {}
+        self.local_nodes_idx = {}
 
-    def transform_labels(self):
+        # Passo 1: Reconstruir a hierarquia
+        inferred_depth = {}
+        for node in self.g.nodes():
+            parts = node.split('.')
+            for i in range(1, len(parts) + 1):
+                sub_path = '.'.join(parts[:i])
+                if sub_path not in inferred_depth:
+                    inferred_depth[sub_path] = i
+
+        # Passo 2: Agrupar os nós por nível
+        for node, depth in inferred_depth.items():
+            if depth not in self.levels:
+                self.levels[depth] = []
+            self.levels[depth].append(node)
+
+        # Passo 3: Ordenação e criação de índices locais
+        self.levels = {key: sorted(self.levels[key]) for key in sorted(self.levels.keys())}
+        self.levels_size = {key: len(value) for key, value in self.levels.items()}
+        self.local_nodes_idx = {idx: {node: i for i, node in enumerate(level_nodes)}
+                                for idx, level_nodes in self.levels.items()}
+        
+    def __transform_labels(self):
         for labels in self.df.categories.values:
-            y_ = np.zeros(len(self.nodes))
+            if self.is_global:
+                y_ = np.zeros(len(self.nodes))
+                
+            if self.is_local:
+                sorted_keys = sorted(self.levels_size.keys())
+                y_local_ = [np.zeros(self.levels_size[key]) for key in sorted_keys]
+
             for t in labels.split('@'):
-                y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
-                y_[self.nodes_idx[t]] = 1
-            self.Y.append(y_)
-        self.Y = np.stack(self.Y)
+                if self.is_global:
+                    y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
+                    y_[self.nodes_idx[t]] = 1
+
+                if self.is_local:
+                    nodes = t.split(".")
+                    for idx in range(1, len(nodes)+1):
+                        local_label = nodes[:idx]
+                        if len(local_label) > 1:
+                            local_label = ".".join(local_label)
+                        else:
+                            local_label = local_label[0]
+                        y_local_[idx-1][self.local_nodes_idx[idx].get(local_label)] = 1
+                        
+            if self.is_global:
+                self.Y.append(y_)
+
+            if self.is_local:
+                self.Y_local.append([np.stack(y) for y in y_local_])
+                
+        if self.is_global:
+            self.Y = np.stack(self.Y)
+
+                
+    def transform_labels(self):
+        self.__transform_labels()
 
     def parse_features(self):
         self.X_cont = []
@@ -382,133 +447,6 @@ class HMCDataset:
 
 
 
-
-
-
-
-##### OLD
-
-class GOFUNDataset:
-    def __init__(self, csv_file, labels_json, output_path='data'):
-        """
-        Initializes the dataset, loading features (X), labels (Y), and optionally the hierarchy graph.
-        """
-        self.g = None
-        self.nodes_idx = None
-        self.g_t = None
-        self.df = None
-        self.X_cont = []
-        self.is_go = False
-        self.is_fma = False
-        if 'GO' in csv_file:
-            self.is_go = True
-
-        labels_json_name = labels_json.split('/')[-1]
-        self.graph_path = os.path.join(output_path, labels_json_name.replace('-labels.json', '.graphml'))
-        self.columns_path = labels_json.replace('-labels', '')
-        self.load_structure(labels_json)
-        with open(self.columns_path, 'r') as f:
-            self.columns = json.load(f)
-
-        self.load_data(
-            csv_file
-        )
-        self.to_eval = [t not in to_skip for t in self.categories['labels']]
-
-    def load_structure(self, labels_json):
-        # Load labels JSON
-        with open(labels_json, 'r') as f:
-            self.categories = json.load(f)
-
-        self.g = nx.DiGraph()
-
-        for cat in self.categories['labels']:
-            terms = cat.split('.')
-            if self.is_go:
-                self.g.add_edge(terms[1], terms[0])
-            else:
-                if len(terms) == 1:
-                    self.g.add_edge(terms[0], 'root')
-                else:
-                    for i in range(2, len(terms) + 1):
-                        self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
-
-        ### Save networkx graph
-        # Para salvar em formato GraphML
-        nx.write_graphml(self.g, self.graph_path)
-
-        self.nodes = sorted(self.g.nodes(),
-                            key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if self.is_go else (
-                            len(x.split('.')), x)
-                            )
-        self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
-        self.g_t = self.g.reverse()
-        self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
-
-    def transform_labels(self):
-        self.Y = []
-        y_ = np.zeros(len(self.nodes))
-        for labels in self.df.categories.values:
-            for t in labels.split('@'):
-                y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, t)]] = 1
-                y_[self.nodes_idx[t]] = 1
-            self.Y.append(y_)
-        self.Y = np.stack(self.Y)
-
-    def parse_features(self):
-        self.X_cont = []
-        self.X_bin = []
-        for features in self.features:
-            cont_features = []
-            bin_features = []
-            for feature in features:
-                # Se 'item' for uma lista, consideramos como binária
-                if isinstance(feature, list):
-                    # Achatar (flatten) essa sublista e colocar na bin_features
-                    for f in feature:
-                        bin_features.append(f)
-                else:
-                    # Se for float ou int, consideramos feature contínua
-                    if feature is None or feature == 'None' or feature == 'nan' or feature == 'NaN' or type(
-                            feature) is None:
-                        cont_features.append(np.nan)
-                    else:
-                        cont_features.append(feature)
-            self.X_cont.append(cont_features)
-            self.X_bin.append(bin_features)
-
-        self.X_cont = np.array(self.X_cont, dtype=float)
-        self.X_bin = np.array(self.X_bin, dtype=int)
-
-    def transform_features(self):
-        self.features = self.df.features.apply(lambda x: ast.literal_eval(x)).tolist()
-        self.parse_features()
-
-    def load_data(self, csv_file):
-        """
-        Load features and labels from CSV, and optionally a hierarchy graph from JSON.
-        """
-        # Load CSV
-        self.df = pd.read_csv(csv_file)
-        self.transform_features()
-        self.transform_labels()
-
-    def compute_matrix_R(self):
-        # Compute matrix of ancestors R
-        # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        R = np.zeros(self.A.shape)
-        np.fill_diagonal(R, 1)
-        g = nx.DiGraph(self.A)
-        for i in range(len(self.A)):
-            descendants = list(nx.descendants(g, i))
-            if descendants:
-                R[i, descendants] = 1
-        R = torch.tensor(R)
-        # Transpose to get the ancestors for each node
-        R = R.transpose(1, 0)
-        self.R = R.unsqueeze(0)
-
-
 def impute_scaler(train, val, device='cuda'):
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont, val.X_cont)))
@@ -519,15 +457,13 @@ def impute_scaler(train, val, device='cuda'):
 
     return train, val
 
-def initialize_dataset(name, dataset_path, output_path):
+def initialize_dataset(name, dataset_path, output_path, is_local=False, is_global=False):
     """
     Initialize train, validation, and test datasets.
     """
     datasets = load_dataset_paths(dataset_path)
     train_csv, valid_csv, test_csv, labels_json, _ = datasets[name]
-
-
-    train_data = HMCDataset(train_csv, labels_json, output_path)
-    val_data = HMCDataset(valid_csv, labels_json, output_path)
-    test_data = HMCDataset(test_csv, labels_json, output_path)
+    train_data = HMCDataset(train_csv, labels_json, is_local, is_global, output_path)
+    val_data = HMCDataset(valid_csv, labels_json, is_local, is_global, output_path)
+    test_data = HMCDataset(test_csv, labels_json, is_local, is_global, output_path)
     return train_data, val_data, test_data
