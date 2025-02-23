@@ -1,141 +1,89 @@
-import json
 import os
 
-import torch
-from torch.utils.data import DataLoader
-import torch.nn as nn
+import torch, random, argparse
+import torch.utils.data
+import numpy as np
 
-from hmc.model import HMCLocalClassificationModel
-from hmc.dataset import HMCDataset
-from hmc.model.losses import show_global_loss, show_local_losses
-from hmc.utils.dir import create_job_id, create_dir
-from hmc.model.arguments import get_parser
+from hmc.model.train_global import train_global
 
 
 def train():
-    print("========================= PyTorch =========================")
-    print("GPUs available: {}".format(torch.cuda.device_count()))
-    print("===========================================================")
+    # Training settings
+    parser = argparse.ArgumentParser(description='Train neural network')
 
-    job_id = create_job_id()
-    print(f"Job ID: {job_id}")
+    # Required  parameters
+    parser.add_argument('--dataset', type=str, required=True,
+                        nargs='+', default=['seq_GO', 'derisi_GO', '0.6', '0.7'],
+                        help='List with dataset names to train')
+    parser.add_argument('--dataset_path', type=str, required=True,
+                        help='dataset path')
+    parser.add_argument('--batch_size', type=int, required=True,
+                        help='input batch size for training')
+    parser.add_argument('--lr', type=float, required=True,
+                        help='learning rate')
+    parser.add_argument('--dropout', type=float, required=True,
+                        help='dropout probability')
+    parser.add_argument('--hidden_dim', type=int, required=True,
+                        help='size of the hidden layers')
+    parser.add_argument('--num_layers', type=int, required=True,
+                        help='number of hidden layers')
+    parser.add_argument('--weight_decay', type=float, required=True,
+                        help='weight decay')
+    parser.add_argument('--non_lin', type=str, required=True,
+                        help='non linearity function to be used in the hidden layers')
+    parser.add_argument('--output_path', type=str, required=True,
+                        help='output path')
+    parser.add_argument('--device', type=int, default=0,
+                        help='device (default:0)')
+    parser.add_argument('--num_epochs', type=int, default=2000,
+                        help='Max number of epochs to train (default:2000)')
+    parser.add_argument('--method', type=str,  default="global", required=True,
+                        help='train method (local or global)')
+    parser.add_argument('--seed', type=int, default=0,
+                        help='random seed (default:0)')
 
-    parser = get_parser()
     args = parser.parse_args()
+    args.hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,
+                   'non_lin': args.non_lin, 'hidden_dim': args.hidden_dim, 'lr': args.lr,
+                   'weight_decay': args.weight_decay}
+    ## Insert her a logic to use all datasets with arguments
 
-    dropouts = [float(rate) for rate in args.dropouts]
-    thresholds = [float(threshold) for threshold in args.thresholds]
-
-    metadata_path = os.path.join(args.input_path, 'metadata.json')
-    labels_path = os.path.join(args.input_path, 'labels.json')
-
-    with open(metadata_path, 'r') as f:
-        metadata = json.loads(f.read())
-
-    with open(labels_path, 'r') as f:
-        labels = json.loads(f.read())
-
-    params = {
-        'levels_size': labels['levels_size'],
-        'input_size': metadata['sequence_size'],
-        'dropouts': dropouts,
-        'thresholds': thresholds
-    }
-
-    assert len(args.dropouts) == metadata['max_depth']
-    assert len(args.lrs) == metadata['max_depth']
-
-    model = HMCLocalClassificationModel(**params)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
-
-    criterions = [nn.BCEWithLogitsLoss(reduction='sum') for _ in labels['levels_size']]
-
-    if torch.cuda.is_available():
-        model = model.to('cuda')
-        criterions = [criterion.to('cuda') for criterion in criterions]
-        
-
-    torch_path = os.path.join(args.input_path, 'torch')
-    metadata['train_torch_path'] = os.path.join(torch_path, 'train')
-    metadata['val_torch_path'] = os.path.join(torch_path, 'val')
-    metadata['test_torch_path'] = os.path.join(torch_path, 'test')
-
-    ds_train = HMCDataset(metadata['train_torch_path'], params['levels_size'])
-    ds_validation = HMCDataset(metadata['val_torch_path'], params['levels_size'])
-
-    train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(ds_validation, batch_size=args.batch_size, shuffle=False)
-
-    assert isinstance(args.output_path, str)
-    model_path: str = os.path.join(args.output_path, 'jobs' ,job_id)
-    create_dir(model_path)
-
-    early_stopping_patience = args.patience
-    best_val_loss = float('inf')
-    patience_counter = 0
-
-    for epoch in range(1, args.epochs+1):
-        model.train()
-        local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
-        for inputs, targets in train_loader:
-            if torch.cuda.is_available():
-                inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
-            outputs = model(inputs)
-            
-            # Zerar os gradientes antes de cada batch
-            optimizer.zero_grad()
-
-            total_loss = 0.0
-            for index, (output, target) in enumerate(zip(outputs, targets)):
-                loss = criterions[index](output, target)
-                total_loss += loss
-                local_train_losses[index] += loss.item()
-
-        # Backward pass (cálculo dos gradientes)
-        total_loss.backward()
-        
-        optimizer.step()
-
-        local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
-        global_train_loss = sum(local_train_losses) / metadata['max_depth']
-
-        print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_train_losses, set='Train')
-        show_global_loss(global_train_loss, set='Train')
-            
-        model.eval()
-        local_val_losses = [0.0 for _ in range(metadata['max_depth'])]
-        with torch.no_grad():
-            for inputs, targets in val_loader:
-                if torch.cuda.is_available():
-                    inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
-                outputs = model(inputs)
-
-                total_val_loss = 0.0
-                for index, (output, target) in enumerate(zip(outputs, targets)):
-                    loss = criterions[index](output, target)
-                    total_val_loss += loss
-                    local_val_losses[index] += loss.item() 
-
-        local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
-        global_val_loss = sum(local_val_losses) / metadata['max_depth']
-
-        print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_val_losses, set='Val')
-        show_global_loss(global_val_loss, set='Val')
-
-        current_val_loss = round(global_val_loss, 4)
-        if current_val_loss <= best_val_loss - 2e-4:
-            best_val_loss = current_val_loss
-            print('new best model')
-            torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
+    if 'all' in args.dataset:
+        datasets = ['cellcycle_GO', 'derisi_GO', 'eisen_GO', 'expr_GO', 'gasch1_GO',
+                    'gasch2_GO', 'seq_GO', 'spo_GO', 'cellcycle_FUN', 'derisi_FUN',
+                    'eisen_FUN', 'expr_FUN', 'gasch1_FUN', 'gasch2_FUN', 'seq_FUN', 'spo_FUN']
+    else:
+        if len(args.dataset) > 1:
+            datasets = [str(dataset) for dataset in args.dataset]
         else:
-            if patience_counter >= early_stopping_patience:
-                print("Early stopping triggered")
-                return None
-            
-            patience_counter += 1
-    return None
+            datasets = [args.dataset]
+            assert ('_' in args.dataset)
+            assert ('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
 
+    # Dictionaries with number of features and number of labels for each dataset
+    args.input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'church': 27,
+                  'derisi': 63, 'eisen': 79, 'expr': 560, 'gasch1': 173, 'gasch2': 52, 'hom': 47034, 'seq': 529,
+                  'spo': 86}
+    args.output_dims_FUN = {'cellcycle': 499, 'church': 499, 'derisi': 499, 'eisen': 461, 'expr': 499, 'gasch1': 499,
+                       'gasch2': 499, 'hom': 499, 'seq': 499, 'spo': 499}
+    args.output_dims_GO = {'cellcycle': 4122, 'church': 4122, 'derisi': 4116, 'eisen': 3570, 'expr': 4128, 'gasch1': 4122,
+                      'gasch2': 4128, 'hom': 4128, 'seq': 4130, 'spo': 4116}
+    args.output_dims = {'FUN': args.output_dims_FUN, 'GO': args.output_dims_GO}
 
+    # Set seed
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
+    random.seed(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # Verifica quantas GPUs estão disponíveis
+    num_gpus = torch.cuda.device_count()
+    print(f"Total de GPUs disponíveis: {num_gpus}")
+
+    args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    for dataset_name in datasets:
+        if args.method == "global":
+            train_global(dataset_name, args)
