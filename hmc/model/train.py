@@ -5,60 +5,29 @@ import torch.utils.data
 import numpy as np
 
 from hmc.model.train_global import train_global
-
+from hmc.model.arguments import get_parser
 
 def train():
     # Training settings
-    parser = argparse.ArgumentParser(description='Train neural network')
-
-    # Required  parameters
-    parser.add_argument('--dataset', type=str, required=True,
-                        nargs='+', default=['seq_GO', 'derisi_GO', '0.6', '0.7'],
-                        help='List with dataset names to train')
-    parser.add_argument('--dataset_path', type=str, required=True,
-                        help='dataset path')
-    parser.add_argument('--batch_size', type=int, required=True,
-                        help='input batch size for training')
-    parser.add_argument('--lr', type=float, required=True,
-                        help='learning rate')
-    parser.add_argument('--dropout', type=float, required=True,
-                        help='dropout probability')
-    parser.add_argument('--hidden_dim', type=int, required=True,
-                        help='size of the hidden layers')
-    parser.add_argument('--num_layers', type=int, required=True,
-                        help='number of hidden layers')
-    parser.add_argument('--weight_decay', type=float, required=True,
-                        help='weight decay')
-    parser.add_argument('--non_lin', type=str, required=True,
-                        help='non linearity function to be used in the hidden layers')
-    parser.add_argument('--output_path', type=str, required=True,
-                        help='output path')
-    parser.add_argument('--device', type=int, default=0,
-                        help='device (default:0)')
-    parser.add_argument('--num_epochs', type=int, default=2000,
-                        help='Max number of epochs to train (default:2000)')
-    parser.add_argument('--method', type=str,  default="global", required=True,
-                        help='train method (local or global)')
-    parser.add_argument('--seed', type=int, default=0,
-                        help='random seed (default:0)')
-
+    parser = get_parser()
     args = parser.parse_args()
+
     args.hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout,
                    'non_lin': args.non_lin, 'hidden_dim': args.hidden_dim, 'lr': args.lr,
                    'weight_decay': args.weight_decay}
     ## Insert her a logic to use all datasets with arguments
 
-    if 'all' in args.dataset:
+    if 'all' in args.datasets:
         datasets = ['cellcycle_GO', 'derisi_GO', 'eisen_GO', 'expr_GO', 'gasch1_GO',
                     'gasch2_GO', 'seq_GO', 'spo_GO', 'cellcycle_FUN', 'derisi_FUN',
                     'eisen_FUN', 'expr_FUN', 'gasch1_FUN', 'gasch2_FUN', 'seq_FUN', 'spo_FUN']
     else:
-        if len(args.dataset) > 1:
-            datasets = [str(dataset) for dataset in args.dataset]
+        if len(args.datasets) > 1:
+            datasets = [str(dataset) for dataset in args.datasets]
         else:
-            datasets = [args.dataset]
-            assert ('_' in args.dataset)
-            assert ('FUN' in args.dataset or 'GO' in args.dataset or 'others' in args.dataset)
+            datasets = [args.datasets]
+            assert ('_' in args.datasets)
+            assert ('FUN' in args.datasets or 'GO' in args.datasets or 'others' in args.datasets)
 
     # Dictionaries with number of features and number of labels for each dataset
     args.input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'church': 27,

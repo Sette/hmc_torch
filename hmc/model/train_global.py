@@ -1,6 +1,6 @@
 
 from hmc.model import ConstrainedFFNNModel, get_constr_out
-from hmc.dataset import initialize_dataset, impute_scaler
+from hmc.dataset import HMCDatasetManager, initialize_dataset
 import os
 
 import torch
@@ -18,22 +18,12 @@ def train_global(dataset_name, args):
     # Load train, val and test set
     data = dataset_name.split('_')[0]
     ontology = dataset_name.split('_')[1]
-    train, val, test = initialize_dataset(dataset_name, args.dataset_path, output_path=args.output_path,
+    hmc_dataset = initialize_dataset(dataset_name, args.dataset_path, output_path=args.output_path,
                                           is_global=True)
-    train.to_eval, val.to_eval, test.to_eval = torch.tensor(train.to_eval, dtype=torch.uint8), torch.tensor(
-        val.to_eval, dtype=torch.uint8), torch.tensor(test.to_eval, dtype=torch.uint8)
+    train, val, test = hmc_dataset.get_torch_dataset()
 
-    R = train.compute_matrix_R().to(args.device)
-
-    train, val = impute_scaler(train, val, device=args.device)
-
-    print(train.X_bin.shape)
-    if train.X_bin.shape[0] > 0:
-        train.X = np.concatenate([train.X_count, train.X_bin], axis=1)
-        val.X = np.concatenate([val.X_count, val.X_bin], axis=1)
-    else:
-        train.X = train.X_count
-        val.X = val.X_count
+    hmc_dataset.compute_matrix_R()
+    R = hmc_dataset.R.to(args.device)
 
     train.X = torch.tensor(train.X).to(args.device)
     val.X = torch.tensor(val.X).to(args.device)
