@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-import numpy as np
-import pandas as pd
 import os
 
 import torch.nn.functional as F
@@ -161,7 +159,7 @@ def get_constr_out(x, R):
     # This produces a (N, C, C) tensor.
     # torch.max(...) is taken along dimension=2, resulting in (N, C).
     # This extracts the maximum along the last dimension, effectively applying the hierarchical constraints.
-    final_out, _ = torch.max(R_batch * c_out, dim=2)
+    final_out, _ = torch.max(R_batch * c_out.double(), dim=2)
     
     return final_out
 
@@ -199,8 +197,4 @@ class ConstrainedFFNNModel(nn.Module):
             else:
                 x = self.f(self.fc[i](x))
                 x = self.drop(x)
-        if self.training:
-            constrained_out = x
-        else:
-            constrained_out = get_constr_out(x, self.R)
-        return constrained_out
+        return x

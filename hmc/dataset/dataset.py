@@ -75,12 +75,6 @@ class HMCDataset_old(Dataset):
         return features, labels
 
 
-
-# Nós que devem ser ignorados
-to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
-
-
-
 def load_json(file_path):
     """
     Loads a JSON file and returns its content.
@@ -310,13 +304,17 @@ class HMCDataset(Dataset):
             self.X_bin.append(bin_features)
 
         self.X_cont = np.array(self.X_cont, dtype=float)
-        ''''
+
         self.X_bin = np.array(self.X_bin, dtype=int)
         if self.X_bin.shape[0] > 0:
             self.X = np.concatenate([self.X_cont, self.X_bin], axis=1)
         else:
             self.X = self.X_cont
-        '''
+        r_, c_ = np.where(np.isnan(self.X))
+        m = np.nanmean(self.X, axis=0)
+        for i, j in zip(r_, c_):
+            self.X[i, j] = m[j]
+
     def transform_features(self):
         self.features = self.df.features.apply(lambda x: ast.literal_eval(x)).tolist()
         self.parse_features()
@@ -340,8 +338,10 @@ class HMCDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        features = torch.tensor(self.X[idx], dtype=torch.float32)
-        labels = torch.tensor(self.Y[idx], dtype=torch.float32)
+        x = self.X[idx]
+        y = np.copy(self.Y[idx])
+        features = torch.tensor(x, dtype=torch.float32)
+        labels = torch.tensor(y, dtype=torch.float32)
         return features, labels
 
 class HMCDatasetManager:
@@ -365,13 +365,13 @@ class HMCDatasetManager:
         self.levels = {}
         self.levels_size = {}
         self.local_nodes_idx = {}
-        self.categories = None
-        self.roots = None
-        self.R = None
-        self.nodes = None
-        self.nodes_idx = None
-        self.g_t = None
-        self.A = None
+        self.categories = []
+        self.roots = []
+        self.nodes = []
+        self.nodes_idx = []
+        self.g_t = []
+        self.A = []
+        self.to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
 
         train_csv, valid_csv, test_csv, labels_json, _ = dataset
 
@@ -414,12 +414,11 @@ class HMCDatasetManager:
 
         # Apply scaling if needed
         if input_scaler:
-            self.train, self.val = impute_scaler(self.train, self.val, device=device)
+            logger.info("input scaler")
+            self.train, self.val = impute_scaler(self.train, self.val)
 
         # Ensure category labels exist before evaluation filtering
-        self.to_eval = (
-            [t not in to_skip for t in self.categories['labels']] if hasattr(self, 'categories') else []
-        )
+        self.to_eval = [t not in self.to_skip for t in self.nodes]
 
     def get_torch_dataset(self):
         return self.train, self.val, self.test
@@ -435,8 +434,7 @@ class HMCDatasetManager:
                 self.g.add_edge(terms[1], terms[0])
             else:
                 if len(terms) == 1:
-                    self.g.add_node(terms[0])
-                    self.roots.append(terms[0])
+                    self.g.add_edge(terms[0], 'root')
                 else:
                     for i in range(2, len(terms) + 1):
                         self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
@@ -482,10 +480,11 @@ class HMCDatasetManager:
         R = torch.tensor(R)
         # Transpose to get the ancestors for each node
         R = R.transpose(1, 0)
-        self.R = R.unsqueeze(0)
+        R = R.unsqueeze(0)
+        return R
 
 
-def impute_scaler(train, val, device: str = 'cpu'):
+def impute_scaler(train, val):
     """
     Impute missing values and apply standard scaling to continuous features.
 
@@ -500,10 +499,9 @@ def impute_scaler(train, val, device: str = 'cpu'):
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X_cont, val.X_cont)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X_cont, val.X_cont)))
-    val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y).to(
-        device)
+    val.X_count, val.Y = scaler.transform(imp_mean.transform(val.X_cont)), torch.tensor(val.Y)
     train.X_count, train.Y = scaler.transform(imp_mean.transform(train.X_cont)), torch.tensor(
-        train.Y).to(device)
+        train.Y)
 
     return train, val
 

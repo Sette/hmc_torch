@@ -1,5 +1,5 @@
 import os
-
+from hmc.utils.dir import create_job_id
 import torch, random, argparse
 import torch.utils.data
 import numpy as np
@@ -7,7 +7,7 @@ import numpy as np
 from hmc.model.train_global import train_global
 from hmc.model.arguments import get_parser
 
-def train():
+def main():
     # Training settings
     parser = get_parser()
     args = parser.parse_args()
@@ -25,9 +25,8 @@ def train():
         if len(args.datasets) > 1:
             datasets = [str(dataset) for dataset in args.datasets]
         else:
-            datasets = [args.datasets]
-            assert ('_' in args.datasets)
-            assert ('FUN' in args.datasets or 'GO' in args.datasets or 'others' in args.datasets)
+            datasets = args.datasets
+
 
     # Dictionaries with number of features and number of labels for each dataset
     args.input_dims = {'diatoms': 371, 'enron': 1001, 'imclef07a': 80, 'imclef07d': 80, 'cellcycle': 77, 'church': 27,
@@ -51,8 +50,15 @@ def train():
     num_gpus = torch.cuda.device_count()
     print(f"Total de GPUs disponíveis: {num_gpus}")
 
-    args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    args.job_id = create_job_id()
+    print(f"Job ID: {args.job_id}")
+
+    #args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     for dataset_name in datasets:
         if args.method == "global":
             train_global(dataset_name, args)
+
+
+if __name__ == "__main__":
+    main()
