@@ -10,7 +10,7 @@ HIDDEN_DIM=2000
 NUM_LAYERS=3
 WEIGHT_DECAY=1e-5
 NON_LIN="relu"
-DEVICE="cuda"
+DEVICE="cpu"
 NUM_EPOCHS=13
 OUTPUT_PATH="/home/bruno/storage/models/gofun"
 METHOD="global"
@@ -18,7 +18,7 @@ METHOD="global"
 # Loop para executar com diferentes seeds
 for SEED in 0
 do
-    python -m hmc.model.train \
+    python -m hmc.train.main \
         --datasets "$DATASET" \
         --dataset_path "$DATASET_PATH" \
         --batch_size "$BATCH_SIZE" \

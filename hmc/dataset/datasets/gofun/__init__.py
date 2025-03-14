@@ -4,6 +4,8 @@ to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
 
 import os
 
+os.environ["DATA_FOLDER"] = "./"
+
 def get_dataset_paths(dataset_type='arff'):
     if dataset_type == 'arff':
         datasets = {
