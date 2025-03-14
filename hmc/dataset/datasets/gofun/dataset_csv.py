@@ -1,6 +1,14 @@
 
+from hmc.dataset.datasets.gofun import to_skip
+from hmc.utils import __load_json__
 
-class csv_data():
+import networkx as nx
+import pandas as pd
+import numpy as np
+
+import json
+
+class HMCDatasetCsv():
     def __init__(self, csv_file, labels_json, is_go):
         self.csv_file = csv_file
         self.labels = __load_json__(labels_json)['labels']

@@ -1,6 +1,6 @@
 from hmc.utils.parser import initialize_dataset_arff_tocsv
 import os
-from hmc.env import get_dataset_paths
+from hmc.dataset.datasets.gofun import get_dataset_paths
 
 os.environ["DATA_FOLDER"] = "./"
 
@@ -19,9 +19,9 @@ if __name__ == '__main__':
         data, ontology = dataset_name.split('_')
         train, val, test = initialize_dataset_arff_tocsv(dataset_name, datasets, output_path)
 
-        #train.to_csv(os.path.join(output_path, train.csv_file))
-        #val.to_csv(os.path.join(output_path, val.csv_file))
-        #test.to_csv(os.path.join(output_path, test.csv_file))
+        train.to_csv(dataset='train')
+        val.to_csv(dataset='valid')
+        test.to_csv(dataset='test')
 
         train.to_pt(dataset='train')
         val.to_pt(dataset='valid')

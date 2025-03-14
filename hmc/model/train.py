@@ -3,9 +3,7 @@ import torch, random
 import torch.utils.data
 import numpy as np
 
-from hmc.model.global_classifier.train_global import train_global
-from hmc.model.global_classifier.train_global_arff import train_global_arff
-from hmc.model.global_classifier.train_globalPL import train_globalPL
+from hmc.train.train_global import train_global
 from hmc.model.arguments import get_parser
 from hmc.utils.dir import create_job_id
 

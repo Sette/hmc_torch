@@ -19,7 +19,6 @@ from hmc.dataset.manager import initialize_dataset_experiments
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["TRAIN"])
 
-from hmc.env import get_dataset_paths
 
 def train_global(dataset_name, args):
     print(".......................................")

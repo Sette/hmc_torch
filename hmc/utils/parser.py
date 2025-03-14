@@ -10,11 +10,14 @@ import keras
 from itertools import chain
 import json
 import os
-from hmc.utils import create_dir, __load_json__
+from hmc.utils import create_dir
 import torch
 import math
 import logging
-from hmc.env import to_skip
+
+from hmc.dataset.datasets.gofun import  HMCDatasetCsv, HMCDatasetArff
+
+
 
 # Criar um logger
 logger = logging.getLogger(__name__)
@@ -51,28 +54,35 @@ class arff_data_to_csv():
         for i, j in zip(r_, c_):
             self.X[i,j] = m[j]
 
-    def to_csv(self, output_file):
+    def to_csv(self, dataset='train'):
         """Salva X e Y como um arquivo CSV."""
         # Criando DataFrame para X
-        output_path = '/'.join(output_file.split('/')[:-1])
-        create_dir(output_path)
-        # Automatically generate column names
-        features = self.X.tolist()
-        num_features = len(features[0])
-        columns = [f"feat_{i}" for i in range(num_features)]
-        # Create DataFrame and save to CSV
-        df_x = pd.DataFrame(features, columns=columns)
+        data_path = os.path.join(self.dataset_path, dataset)
+        create_dir(data_path)
+        batch_size = 1024 * 50  # 50k records from each file batch
+        count = 0
+        total = math.ceil(len(self.X) / batch_size)
+        for i in range(0, len(self.X), batch_size):
+            batch_X = self.X[i:i + batch_size]
+            batch_Y = self.Y[i:i + batch_size]
+            num_features = len(batch_X[0])
+            columns = [f"feat_{i}" for i in range(num_features)]
+            # Create DataFrame and save to CSV
+            df_x = pd.DataFrame(batch_X, columns=columns)
+            # Criando DataFrame para Y, convertendo para int se necessário
+            df_y = pd.DataFrame({'labels': self.Y})
+            # Concatenando X e Y
+            df = pd.concat([df_x, df_y], axis=1)
 
-        #df_X = pd.DataFrame({'features': [json.dumps(x.tolist()) for x in self.X]})
-        #df_X = pd.DataFrame({'features': [json.dumps(x.tolist()) for x in self.X]})
-        # Criando DataFrame para Y, convertendo para int se necessário
-        df_y = pd.DataFrame({'labels':self.Y})
-        # Concatenando X e Y
-        df = pd.concat([df_x, df_y], axis=1)
+            path = f"{data_path}/{str(count).zfill(10)}.pt"
 
-        # Salvando como CSV
-        df.to_csv(output_file, sep='|' , index=False)
-        print(f"CSV salvo em: {output_file}")
+            # Salvando como CSV
+            df.to_csv(path, sep='|', index=False)
+            print(f"CSV salvo em: {path}")
+            count += 1
+            print(f"{count}/{total} batches / {count * batch_size} processed")
+
+        print(f"{count}/{total} batches / {len(self.X)} processed")
 
     def to_pt(self, dataset='train'):
         #logger.info(f'X shape: {self.X.shape} e Y shape: {self.Y.shape}')
@@ -154,16 +164,16 @@ class arff_data_to_csv():
 
 def initialize_dataset_arff(name, datasets):
     is_go, train, val, test = datasets[name]
-    return arff_data(train, is_go), arff_data(val, is_go), arff_data(test, is_go)
+    return HMCDatasetArff(train, is_go), HMCDatasetArff(val, is_go), HMCDatasetArff(test, is_go)
 
 def initialize_dataset_csv(name, datasets):
     train, val, test, labels_json = datasets[name]
     is_go = any(keyword in train for keyword in ['GO', 'go'])
-    return csv_data(train, labels_json, is_go), csv_data(val, labels_json, is_go), csv_data(test, labels_json, is_go)
+    return HMCDatasetCsv(train, labels_json, is_go), HMCDatasetCsv(val, labels_json, is_go), HMCDatasetCsv(test, labels_json, is_go)
 
 def initialize_other_dataset(name, datasets):
     is_go, train, test = datasets[name]
-    return arff_data(train, is_go), arff_data(test, is_go, True)
+    return HMCDatasetArff(train, is_go), HMCDatasetArff(test, is_go, True)
 
 def initialize_dataset_arff_tocsv(name, datasets, output_path):
     is_go, train, val, test = datasets[name]

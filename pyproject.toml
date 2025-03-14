@@ -12,14 +12,21 @@ numpy = ">=1.25.0"
 pandas = ">=1.5.0"
 dataset = ">=1.6.2"
 scikit-learn = ">=1.2.2"
-torch = { version = ">=2.0.0", source = "pytorch" }
-torchvision = { version = ">=0.16.0", source = "pytorch" }
-torchaudio = { version = ">=2.0.0", source = "pytorch" }
+torch = { version = ">=2.0.0", source = "pytorch-cpu" }
+torchvision = { version = ">=0.16.0", source = "pytorch-cpu" }
+torchaudio = { version = ">=2.0.0", source = "pytorch-cpu" }
 lightning = {extras = ["extra"], version = "^2.5.0.post0"}
+keras = "^3.9.0"
+tensorflow = "^2.19.0"
 
 [[tool.poetry.source]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu118"
+priority = "supplemental"
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 priority = "supplemental"
 
 

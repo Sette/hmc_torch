@@ -16,7 +16,7 @@ OUTPUT_PATH="/home/bruno/storage/models/gofun"
 METHOD="global"
 
 # Loop para executar com diferentes seeds
-for SEED in 0 1 2 3 4 5 6 7 8 9
+for SEED in 0
 do
     python -m hmc.model.train \
         --datasets "$DATASET" \
@@ -34,6 +34,8 @@ do
         --output_path "$OUTPUT_PATH" \
         --method "$METHOD" &
 done
+
+
 
 # Aguarda todos os processos terminarem antes de finalizar o script
 wait

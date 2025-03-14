@@ -1,12 +1,15 @@
 
 import torch
-import os
 import numpy as np
 import networkx as nx
 import logging
 from hmc.utils import __load_json__
-from hmc.env import get_dataset_paths, to_skip
-from hmc.dataset.dataset import HMCDatasetArff, HMCDatasetCsv, HMCDatasetTorch
+from hmc.dataset.datasets.gofun import get_dataset_paths
+
+from hmc.dataset.datasets.gofun import to_skip
+
+from hmc.dataset import  HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
+
 # Configurar o logger
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",

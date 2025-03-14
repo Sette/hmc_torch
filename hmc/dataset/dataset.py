@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import ast
-from hmc.utils import create_dir, __load_json__
 import logging
 import torch
 import keras
@@ -24,9 +23,6 @@ BUFFER_SIZE = 10
 
 # Skip the root nodes
 to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
-
-
-
 
 
 class HMCDatasetCsv:

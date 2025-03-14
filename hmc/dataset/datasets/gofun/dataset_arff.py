@@ -1,9 +1,15 @@
 
+from hmc.dataset.datasets.gofun import to_skip
+import keras
+
+import networkx as nx
+import pandas as pd
+import numpy as np
+from itertools import chain
 
 
 
-
-class arff_data():
+class HMCDatasetArff():
     def __init__(self, arff_file, is_go):
         self.arff_file = arff_file
         self.X, self.Y, self.A, self.terms, self.g = parse_arff(arff_file=arff_file, is_go=is_go)
