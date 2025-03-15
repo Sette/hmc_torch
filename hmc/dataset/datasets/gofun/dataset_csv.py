@@ -5,7 +5,6 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import ast
-import json
 import os
 
 def load_and_concat_csv_files(directory, sep='|'):
@@ -30,23 +29,23 @@ def load_and_concat_csv_files(directory, sep='|'):
 class HMCDatasetCsv():
     def __init__(self, csv_path, is_go):
         self.df = pd.DataFrame()
-        self.x, self.y = None, None
+        self.X, self.Y = None, None
         self.is_go = is_go
         self.csv_path = csv_path
         self.parse_csv()
 
     def set_y(self, y):
-        self.y = np.stack(y)
+        self.Y = np.stack(y)
 
     def transform_features(self):
-        self.x = self.df.features.apply(lambda x : ast.literal_eval(x)).tolist()
+        self.X = self.df.features.apply(lambda x : ast.literal_eval(x)).tolist()
 
     def parse_csv(self):
         #self.df = pd.read_csv(self.csv_path, sep='|')
         self.df = load_and_concat_csv_files(self.csv_path, sep='|')
         #X = df['features'].tolist()
         #self.df['features'] = self.df['features'].apply(json.loads)
-        self.y = self.df['labels'].tolist()
+        self.Y = self.df['labels'].tolist()
         self.transform_features()
 
 

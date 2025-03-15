@@ -63,20 +63,20 @@ def train_global(dataset_name, args):
     R = R.transpose(1, 0)
     R = R.unsqueeze(0).to(device)
 
-    scaler = preprocessing.StandardScaler().fit(np.concatenate((train.x, valid.x)))
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.x, valid.x)))
-    valid.x, valid.y = torch.tensor(scaler.transform(imp_mean.transform(valid.x))).clone().detach().to(device), torch.tensor(
-        valid.y, dtype=torch.double).clone().detach().to(device)
+    scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X, valid.X)))
+    valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(device), torch.tensor(
+        valid.Y, dtype=torch.double).clone().detach().to(device)
 
-    train.x, train.y = torch.tensor(scaler.transform(imp_mean.transform(train.x))).clone().detach().to(
-        device), torch.tensor(train.y, dtype=torch.double).clone().detach().to(device)
-    test.x, test.y = torch.as_tensor(scaler.transform(imp_mean.transform(test.x))).clone().detach().to(
-        device), torch.as_tensor(test.y, dtype=torch.double).clone().detach().to(
+    train.X, train.Y = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(
+        device), torch.tensor(train.Y, dtype=torch.double).clone().detach().to(device)
+    test.X, test.Y = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(
+        device), torch.as_tensor(test.Y, dtype=torch.double).clone().detach().to(
         device)
 
     # Create loaders
-    train_dataset = [(x, y) for (x, y) in zip(train.x, train.y)]
-    test_dataset = [(x, y) for (x, y) in zip(test.x, test.y)]
+    train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
+    test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
 
     train_loader = DataLoader(dataset=train_dataset,
                                                batch_size=args.batch_size,
