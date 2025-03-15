@@ -47,7 +47,7 @@ class arff_data_to_csv():
         else:
             self.dataset_path = os.path.join(output_path, 'datasets_FUN', dataset_name)
         create_dir(self.dataset_path)
-        self.X, self.Y = self.parse_arff_to_csv(arff_file=arff_file, is_go=is_go)
+        self.X, self.Y = self.parse_arff_to_csv(arff_file=arff_file)
         r_, c_ = np.where(np.isnan(self.X))
         m = np.nanmean(self.X, axis=0)
         for i, j in zip(r_, c_):
@@ -107,12 +107,11 @@ class arff_data_to_csv():
 
         print(f"{count}/{total} batches / {len(self.X)} processed")
 
-    def parse_arff_to_csv(self, arff_file, is_go=False):
+    def parse_arff_to_csv(self, arff_file):
         with open(arff_file) as f:
             read_data = False
-            X = []
-            Y = []
-
+            x = []
+            y = []
             feature_types = []
             d = []
             cats_lens = []
@@ -123,8 +122,8 @@ class arff_data_to_csv():
                         h = l.split('hierarchical')[1].strip()
                         for branch in h.split(','):
                             branch = branch.replace('/', '.')
+                            #terms = branch.split('/')
                             all_terms.append(branch)
-
                     else:
                         _, f_name, f_type = l.split()
 
@@ -142,23 +141,23 @@ class arff_data_to_csv():
                     read_data = True
                 elif read_data:
                     d_line = l.split('%')[0].strip().split(',')
-                    lab = d_line[len(feature_types)].replace('/', '.').strip()
+                    lab = d_line[len(feature_types)].strip().replace('/', '.')
 
-                    X.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[:len(feature_types)])])))
+                    x.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[:len(feature_types)])])))
 
                     #for t in lab.split('@'):
                     #    y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1
                     #    y_[nodes_idx[t.replace('/', '.')]] = 1
-                    Y.append(lab)
-            X = np.array(X)
-            Y = np.stack(Y)
-            categories = {'labels': all_terms}
+                    y.append(lab)
+            x = np.array(x)
+            #Y = np.stack(Y)
             if 'train' in arff_file:
+                categories = {'labels': all_terms}
                 labels_file = os.path.join(str(self.dataset_path), 'labels.json')
                 with open(labels_file, 'w+') as f:
                     f.write(json.dumps(categories))
             #np.save('all_terms.npy', np.array(all_terms))
-        return X, Y
+        return x, y
 
 
 
