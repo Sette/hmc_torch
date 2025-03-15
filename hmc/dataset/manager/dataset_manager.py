@@ -136,8 +136,8 @@ class HMCDatasetManager:
     def transform_labels(self, dataset_labels):
         y_local_ = []
         y_ = []
-        y = []
-        y_local = []
+        Y = []
+        Y_local = []
         for labels in dataset_labels:
             if self.is_global:
                 y_ = np.zeros(len(self.nodes))
@@ -158,13 +158,13 @@ class HMCDatasetManager:
                             y_local_[depth][self.local_nodes_idx[depth].get(ancestor)] = 1
 
             if self.is_global:
-                y.append(y_)
+                Y.append(y_)
             else:
-                y_local.append([np.stack(y) for y in y_local_])
-                return y_local
+                Y_local.append([np.stack(y) for y in y_local_])
+                return Y_local
         if self.is_global:
-            y = np.stack(y)
-            return y
+            Y = np.stack(Y)
+            return Y
 
     def load_csv_data(self):
         """
