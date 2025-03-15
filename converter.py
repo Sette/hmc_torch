@@ -8,7 +8,7 @@ if __name__ == '__main__':
     datasets = get_dataset_paths(dataset_type='arff')
     dataset_name = "seq_FUN"
     data_path = os.environ["DATA_FOLDER"]
-    output_path = os.path.join(data_path, 'HMC_data_torch')
+    output_path = os.path.join(data_path, 'data' ,'HMC_data_torch')
 
 
     #datasets_name = ['cellcycle_GO', 'derisi_GO', 'eisen_GO', 'expr_GO', 'gasch1_GO',
