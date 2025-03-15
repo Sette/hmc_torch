@@ -22,7 +22,7 @@ def train_global(dataset_name, args):
 
     hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type='arff', is_global=True)
     train, valid, test = hmc_dataset.get_datasets()
-    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
+    to_eval = hmc_dataset.to_eval
 
     experiment = True
 
