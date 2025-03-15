@@ -1,11 +1,8 @@
 
 from sklearn.metrics import average_precision_score
-
-from hmc.env import SRC_LOG_LEVELS
 from hmc.model.global_classifier import ConstrainedFFNNModel, get_constr_out
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
-import logging
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -13,13 +10,7 @@ import torch.nn as nn
 import numpy as np
 import networkx as nx
 from hmc.utils import create_dir
-
-
 from hmc.dataset.manager import initialize_dataset_experiments
-
-
-log = logging.getLogger(__name__)
-log.setLevel(SRC_LOG_LEVELS["TRAIN"])
 
 
 def train_global(dataset_name, args):
@@ -65,25 +56,29 @@ def train_global(dataset_name, args):
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X, valid.X)))
-    valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(device), torch.tensor(
-        valid.Y, dtype=torch.double).clone().detach().to(device)
+    valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(
+        device), torch.tensor(valid.Y).clone().detach().to(device)
 
     train.X, train.Y = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(
-        device), torch.tensor(train.Y, dtype=torch.double).clone().detach().to(device)
+        device), torch.tensor(train.Y).clone().detach().to(device)
     test.X, test.Y = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(
-        device), torch.as_tensor(test.Y, dtype=torch.double).clone().detach().to(
+        device), torch.as_tensor(test.Y).clone().detach().to(
         device)
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
+    if ('others' not in args.datasets):
+        val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
+        for (x, y) in zip(valid.X, valid.Y):
+            train_dataset.append((x, y))
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
 
     train_loader = DataLoader(dataset=train_dataset,
-                                               batch_size=args.batch_size,
-                                               shuffle=True)
+                              batch_size=args.batch_size,
+                              shuffle=True)
     test_loader = DataLoader(dataset=test_dataset,
-                                              batch_size=args.batch_size,
-                                              shuffle=False)
+                             batch_size=args.batch_size,
+                             shuffle=False)
 
 
 
@@ -124,7 +119,7 @@ def train_global(dataset_name, args):
             train_output = get_constr_out(train_output, R)
             train_output = (1 - labels) * constr_output.double() + labels * train_output
 
-            loss = criterion(train_output[:, to_eval], labels[:, to_eval])
+            loss = criterion(train_output[:,to_eval], labels[:, to_eval])
 
             predicted = constr_output.data > 0.5
 
@@ -142,6 +137,7 @@ def train_global(dataset_name, args):
 
         x = x.to(device)
         y = y.to(device)
+
 
         constrained_output = model(x.float())
         predicted = constrained_output.data > 0.5
@@ -170,4 +166,5 @@ def train_global(dataset_name, args):
     f = open('results/' + dataset_name + '.csv', 'a')
     f.write(str(args.seed) + ',' + str(epoch) + ',' + str(score) + '\n')
     f.close()
+
 

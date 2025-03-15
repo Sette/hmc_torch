@@ -1,7 +1,5 @@
 
-
 from sklearn.metrics import average_precision_score
-from hmc.dataset.manager import initialize_dataset_experiments
 from hmc.model.global_classifier import  ConstrainedFFNNModel, get_constr_out
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
@@ -11,7 +9,8 @@ import torch.nn as nn
 import numpy as np
 import networkx as nx
 from hmc.utils import create_dir
-
+from torch.utils.data import DataLoader
+from hmc.dataset.manager import initialize_dataset_experiments
 
 def train_global_arff(dataset_name, args):
     print(".......................................")
@@ -69,10 +68,10 @@ def train_global_arff(dataset_name, args):
             train_dataset.append((x, y))
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
 
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+    train_loader = DataLoader(dataset=train_dataset,
                                                batch_size=args.batch_size,
                                                shuffle=True)
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+    test_loader = DataLoader(dataset=test_dataset,
                                               batch_size=args.batch_size,
                                               shuffle=False)
 
