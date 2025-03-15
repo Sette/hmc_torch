@@ -19,9 +19,10 @@ def train_globalPL(dataset_name, args):
     device = torch.device(args.device)
     data, ontology = dataset_name.split('_')
 
-    hmc_dataset = initialize_dataset_experiments(dataset_name, device='cuda', dataset_type='csv', is_global=True)
-    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
+    # Load dataset paths
+    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.devic, dataset_type='arff', is_global=True)
     train, valid, test = hmc_dataset.get_datasets()
+    to_eval = torch.as_tensor(train.to_eval, dtype=torch.bool).clone().detach()
 
     experiment = True
 

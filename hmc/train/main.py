@@ -5,6 +5,7 @@ import numpy as np
 
 from hmc.train.train_global import train_global
 from hmc.train.train_global_arff import train_global_arff
+from hmc.train.train_globalPL import train_globalPL
 from hmc.model.arguments import get_parser
 from hmc.utils.dir import create_job_id
 
@@ -76,7 +77,7 @@ def main():
 
     for dataset_name in datasets:
         if args.method == "global":
-            train_global(dataset_name, args)
+            train_global_arff(dataset_name, args)
 
 
 if __name__ == "__main__":
