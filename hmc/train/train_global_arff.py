@@ -10,6 +10,7 @@ from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
 import networkx as nx
+from hmc.utils import create_dir
 
 
 def train_global_arff(dataset_name, args):
@@ -156,7 +157,7 @@ def train_global_arff(dataset_name, args):
             y_test = torch.cat((y_test, y), dim=0)
 
     score = average_precision_score(y_test[:, to_eval], constr_test.data[:, to_eval], average='micro')
-
+    create_dir('results')
     f = open('results/' + dataset_name + '.csv', 'a')
     f.write(str(args.seed) + ',' + str(epoch) + ',' + str(score) + '\n')
     f.close()
