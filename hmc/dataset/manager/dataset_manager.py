@@ -79,7 +79,7 @@ class HMCDatasetManager:
         # Load labels JSON
         self.labels = __load_json__(labels_json)
         for cat in self.labels['labels']:
-            terms = cat.split('.')
+            terms = cat.split('/')
             if self.is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
@@ -146,8 +146,8 @@ class HMCDatasetManager:
                 y_local_ = [np.zeros(self.levels_size.get(key)) for key in sorted_keys]
             for node in labels.split('@'):
                 if self.is_global:
-                    y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node)]] = 1
-                    y_[self.nodes_idx[node]] = 1
+                    y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node.replace('/', '.'))]] = 1
+                    y_[self.nodes_idx[node.replace('/', '.')]] = 1
 
                 if not self.is_global:
                     depth = nx.shortest_path_length(self.g_t, "root").get(node)

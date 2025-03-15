@@ -121,7 +121,6 @@ class arff_data_to_csv():
                     if l.startswith('@ATTRIBUTE class'):
                         h = l.split('hierarchical')[1].strip()
                         for branch in h.split(','):
-                            branch = branch.replace('/', '.')
                             #terms = branch.split('/')
                             all_terms.append(branch)
                     else:
@@ -141,7 +140,7 @@ class arff_data_to_csv():
                     read_data = True
                 elif read_data:
                     d_line = l.split('%')[0].strip().split(',')
-                    lab = d_line[len(feature_types)].strip().replace('/', '.')
+                    lab = d_line[len(feature_types)].strip()
 
                     x.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[:len(feature_types)])])))
 
