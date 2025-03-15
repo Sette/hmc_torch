@@ -37,7 +37,6 @@ class HMCDatasetManager:
 
     def __init__(self, dataset, dataset_type='csv', device='cpu', is_global=False):
         # Extract dataset paths
-
         self.test, self.train, self.valid = None, None, None
         self.levels, self.levels_size,  self.nodes_idx, self.local_nodes_idx = {}, {}, {}, {}
         self.labels, self.roots, self.nodes, self.g_t, self.A = [], [], [], [], []
@@ -171,9 +170,9 @@ class HMCDatasetManager:
         """
         Load features and labels from CSV, and optionally a hierarchy graph from JSON.
         """
-        self.train = HMCDatasetCsv(self.train_file)
-        self.valid = HMCDatasetCsv(self.valid_file)
-        self.test = HMCDatasetCsv(self.test_file)
+        self.train = HMCDatasetCsv(self.train_file, is_go=self.is_go)
+        self.valid = HMCDatasetCsv(self.valid_file, is_go=self.is_go)
+        self.test = HMCDatasetCsv(self.test_file, is_go=self.is_go)
 
         dataset_labels = self.train.df.labels.values
         logger.info(f"Transforming train labels")

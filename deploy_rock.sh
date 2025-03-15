@@ -70,5 +70,5 @@ else
         poetry install --no-root &&
         chmod +x $SCRIPT_TO_RUN && ./train.sh --device cuda
     "
-    echo "Treinamento iniciado sem tmux."
+    echo "Treinamento terminado sem tmux."
 fi

@@ -5,7 +5,6 @@ from pyexpat import features
 
 import numpy as np
 import pandas as pd
-import networkx as nx
 import keras
 from itertools import chain
 import json
@@ -57,7 +56,7 @@ class arff_data_to_csv():
     def to_csv(self, dataset='train'):
         """Salva X e Y como um arquivo CSV."""
         # Criando DataFrame para X
-        data_path = os.path.join(self.dataset_path, dataset)
+        data_path = os.path.join(str(self.dataset_path), dataset, 'csv')
         create_dir(data_path)
         batch_size = 1024 * 50  # 50k records from each file batch
         count = 0
@@ -65,16 +64,17 @@ class arff_data_to_csv():
         for i in range(0, len(self.X), batch_size):
             batch_X = self.X[i:i + batch_size]
             batch_Y = self.Y[i:i + batch_size]
-            num_features = len(batch_X[0])
-            columns = [f"feat_{i}" for i in range(num_features)]
+            #num_features = len(batch_X[0])
+            #columns = [f"feat_{i}" for i in range(num_features)]
             # Create DataFrame and save to CSV
-            df_x = pd.DataFrame(batch_X, columns=columns)
+            #df_x = pd.DataFrame(batch_X, columns=columns)
+            df_x = pd.DataFrame({'features': batch_X.tolist()})
             # Criando DataFrame para Y, convertendo para int se necessário
-            df_y = pd.DataFrame({'labels': self.Y})
+            df_y = pd.DataFrame({'labels': batch_Y})
             # Concatenando X e Y
             df = pd.concat([df_x, df_y], axis=1)
 
-            path = f"{data_path}/{str(count).zfill(10)}.pt"
+            path = f"{data_path}/{str(count).zfill(10)}.csv"
 
             # Salvando como CSV
             df.to_csv(path, sep='|', index=False)
@@ -88,7 +88,7 @@ class arff_data_to_csv():
         #logger.info(f'X shape: {self.X.shape} e Y shape: {self.Y.shape}')
         """Salva X e Y como um arquivo pt."""
         # Criando DataFrame para X
-        data_path = os.path.join(self.dataset_path, dataset)
+        data_path = os.path.join(str(self.dataset_path), dataset, 'torch')
         create_dir(data_path)
         batch_size = 1024 * 50  # 50k records from each file batch
         count = 0
@@ -154,7 +154,7 @@ class arff_data_to_csv():
             Y = np.stack(Y)
             categories = {'labels': all_terms}
             if 'train' in arff_file:
-                labels_file = os.path.join(self.dataset_path, 'labels.json')
+                labels_file = os.path.join(str(self.dataset_path), 'labels.json')
                 with open(labels_file, 'w+') as f:
                     f.write(json.dumps(categories))
             #np.save('all_terms.npy', np.array(all_terms))

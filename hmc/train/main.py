@@ -76,7 +76,7 @@ def main():
 
     for dataset_name in datasets:
         if args.method == "global":
-            train_global_arff(dataset_name, args)
+            train_global(dataset_name, args)
 
 
 if __name__ == "__main__":

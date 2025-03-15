@@ -1,53 +1,56 @@
 
 from hmc.dataset.datasets.gofun import to_skip
-from hmc.utils import __load_json__
 
 import networkx as nx
 import pandas as pd
 import numpy as np
-
+import ast
 import json
+import os
+
+def load_and_concat_csv_files(directory, sep='|'):
+    """
+    Loads all CSV files from a given directory and concatenates them into a single DataFrame.
+    :param directory: Path to the directory containing CSV files.
+    :return: A single concatenated DataFrame.
+    """
+    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+    dataframes = []
+
+    for file in csv_files:
+        file_path = os.path.join(directory, file)
+        df = pd.read_csv(file_path, sep=sep)
+        # Convert 'features' column from string representation of lists to actual lists
+        if 'features' in df.columns:
+            print('convertendo string em array')
+            df['features'] = df['features'].apply(lambda x: np.array(ast.literal_eval(x)) if isinstance(x, str) else x)
+
+        dataframes.append(df)
+
+    return pd.concat(dataframes, ignore_index=True) if dataframes else None
 
 class HMCDatasetCsv():
-    def __init__(self, csv_file, labels_json, is_go):
-        self.csv_file = csv_file
-        self.labels = __load_json__(labels_json)['labels']
-        self.X, self.Y, self.A, self.terms, self.g = parse_csv(csv_file=self.csv_file, labels=self.labels , is_go=is_go)
-        self.to_eval = [t not in to_skip for t in self.terms]
+    def __init__(self, csv_path, is_go):
+        self.df = pd.DataFrame()
+        self.X, self.Y = None, None
+        self.is_go = is_go
+        self.csv_path = csv_path
+        self.parse_csv()
+
+    def set_y(self, y):
+        self.Y = np.stack(y)
+        self.X = np.array(self.X)
+
+    def parse_csv(self):
+        #self.df = pd.read_csv(self.csv_path, sep='|')
+        self.df = load_and_concat_csv_files(self.csv_path, sep='|')
+        #X = df['features'].tolist()
+        #self.df['features'] = self.df['features'].apply(json.loads)
+        self.X = self.df['features'].tolist()
+        self.Y = self.df['labels'].tolist()
 
 
-def parse_csv(csv_file, labels, is_go=False):
-    df = pd.read_csv(csv_file, sep='|')
-    Y = []
-    #X = df['features'].tolist()
-    df['features'] = df['features'].apply(json.loads)
-    X = df['features'].tolist()
-    #X = np.array([json.loads(x) for x in df['features']])
-    g = nx.DiGraph()
-    for branch in labels:
-        terms = branch.split('.')
-        if is_go:
-            g.add_edge(terms[1], terms[0])
-        else:
-            if len(terms) == 1:
-                g.add_edge(terms[0], 'root')
-            else:
-                for i in range(2, len(terms) + 1):
-                    g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
+        #X = np.array([json.loads(x) for x in df['features']])
 
-    nodes = sorted(g.nodes(), key=lambda x: (nx.shortest_path_length(g, x, 'root'), x) if is_go else (
-        len(x.split('.')), x))
-    nodes_idx = dict(zip(nodes, range(len(nodes))))
-    g_t = g.reverse()
-    data_labels = df['labels'].values.tolist()
-    for data in data_labels:
-        y_ = np.zeros(len(nodes))
-        for t in data.split('@'):
-            y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1
-            y_[nodes_idx[t.replace('/', '.')]] = 1
-        Y.append(y_)
-    X = np.array(X)
-    Y = np.stack(Y)
 
-    return X, Y, np.array(nx.to_numpy_array(g, nodelist=nodes)), nodes, g
 

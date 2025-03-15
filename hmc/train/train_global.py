@@ -12,6 +12,8 @@ from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
 import networkx as nx
+from hmc.utils import create_dir
+
 
 from hmc.dataset.manager import initialize_dataset_experiments
 
@@ -27,7 +29,7 @@ def train_global(dataset_name, args):
     device = torch.device(args.device)
     data, ontology = dataset_name.split('_')
 
-    hmc_dataset = initialize_dataset_experiments(dataset_name, device='cuda', dataset_type='arff', is_global=True)
+    hmc_dataset = initialize_dataset_experiments(dataset_name, device='cuda', dataset_type='csv', is_global=True)
     to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
     train, valid, test = hmc_dataset.get_datasets()
 
@@ -164,7 +166,7 @@ def train_global(dataset_name, args):
             y_test = torch.cat((y_test, y), dim=0)
 
     score = average_precision_score(y_test[:, to_eval], constr_test.data[:, to_eval], average='micro')
-
+    create_dir('results')
     f = open('results/' + dataset_name + '.csv', 'a')
     f.write(str(args.seed) + ',' + str(epoch) + ',' + str(score) + '\n')
     f.close()
