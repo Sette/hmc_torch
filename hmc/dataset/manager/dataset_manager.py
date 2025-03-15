@@ -207,6 +207,7 @@ class HMCDatasetManager:
         self.train = HMCDatasetArff(self.train_file, is_go=self.is_go)
         self.valid = HMCDatasetArff(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetArff(self.test_file, is_go=self.is_go)
+        self.A = self.train.A
 
     def get_datasets(self):
         return self.train, self.valid, self.test

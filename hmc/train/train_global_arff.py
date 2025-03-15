@@ -41,10 +41,10 @@ def train_global_arff(dataset_name, args):
 
     # Compute matrix of ancestors R
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is descendant of class j
-    R = np.zeros(train.A.shape)
+    R = np.zeros(hmc_dataset.A.shape)
     np.fill_diagonal(R, 1)
-    g = nx.DiGraph(train.A)  # train.A is the matrix where the direct connections are stored
-    for i in range(len(train.A)):
+    g = nx.DiGraph(hmc_dataset.A)  # train.A is the matrix where the direct connections are stored
+    for i in range(len(hmc_dataset.A)):
         ancestors = list(nx.descendants(g, i))  # here we need to use the function nx.descendants() because in the directed graph the edges have source from the descendant and point towards the ancestor
         if ancestors:
             R[i, ancestors] = 1
