@@ -45,8 +45,16 @@ TMUX_CHOICE=$(echo "$TMUX_CHOICE" | tr '[:upper:]' '[:lower:]')  # Converte para
 if [ "$TMUX_CHOICE" = "s" ]; then
     echo "Executando o script de treinamento dentro do tmux..."
     ssh -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "
+        source ~/.zshrc &&
         tmux has-session -t $TMUX_SESSION 2>/dev/null || tmux new-session -d -s $TMUX_SESSION
-        tmux send-keys -t $TMUX_SESSION 'cd $REMOTE_PATH && chmod +x $SCRIPT_TO_RUN && ./train.sh' C-m
+        tmux send-keys -t $TMUX_SESSION 'source ~/.zshrc &&
+        cd $REMOTE_PATH &&
+        python3 -m venv .venv &&
+        source .venv/bin/activate &&
+        poetry source add pytorch --priority=explicit &&
+        poetry source remove pytorch-cpu || true &&
+        poetry install --no-root &&
+        chmod +x $SCRIPT_TO_RUN && ./train.sh --device cuda' C-m
     "
     echo "Treinamento iniciado dentro do tmux! Sessão: '$TMUX_SESSION'."
 else
