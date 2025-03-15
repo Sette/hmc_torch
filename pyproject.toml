@@ -9,22 +9,17 @@ readme = "README.md"
 python = "^3.10"
 tqdm = ">=4.66.4"
 numpy = ">=1.25.0"
+torch = ">=2.2.0"
+torchvision = ">=0.16.0"
+torchaudio = ">=2.0.0"
 pandas = ">=1.5.0"
 dataset = ">=1.6.2"
 scikit-learn = ">=1.2.2"
-
-[tool.poetry.group.torch-cuda.dependencies]
-torch = { version = ">=2.0.0", source = "pytorch-gpu" }
-torchvision = { version = ">=0.16.0", source = "pytorch-gpu" }
-torchaudio = { version = ">=2.0.0", source = "pytorch-gpu" }
 lightning = {extras = ["extra"], version = "^2.5.0.post0"}
+keras = "^3.9.0"
+tensorflow = "^2.19.0"
 
-[tool.poetry.group.torch-cpu.dependencies]
-torch = { version = ">=2.0.0", source = "pytorch-cpu" }
-torchvision = { version = ">=0.16.0", source = "pytorch-cpu" }
-torchaudio = { version = ">=2.0.0", source = "pytorch-cpu" }
-lightning = {extras = ["extra"], version = "^2.5.0.post0"}
-
+# Fontes do PyTorch (ajustadas no deploy.sh)
 [[tool.poetry.source]]
 name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
@@ -34,11 +29,3 @@ priority = "supplemental"
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 priority = "supplemental"
-
-
-[tool.poetry.group.dev.dependencies]
-ipykernel = "^6.29.5"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

@@ -8,6 +8,19 @@ REMOTE_PATH="/home/bruno/git/hmc_torch"
 SCRIPT_TO_RUN="train.sh"  # Nome do script a ser executado remotamente
 TMUX_SESSION="train_session"  # Nome da sessão tmux
 
+# Verifica se foi passado um argumento (cuda ou cpu)
+if [ "$#" -ne 1 ]; then
+    echo "Uso: $0 [cuda | cpu]"
+    exit 1
+fi
+
+PYTORCH_MODE=$1
+
+if [ "$PYTORCH_MODE" != "cuda" ] && [ "$PYTORCH_MODE" != "cpu" ]; then
+    echo "Erro: O argumento deve ser 'cuda' ou 'cpu'."
+    exit 1
+fi
+
 # Pergunta ao usuário se deseja executar git pull antes de rodar o treinamento
 echo -n "Deseja executar git pull antes de iniciar o treinamento? (s/n): "
 read GIT_PULL_CHOICE
@@ -38,12 +51,15 @@ if [ "$TMUX_CHOICE" = "s" ]; then
     echo "Treinamento iniciado dentro do tmux! Sessão: '$TMUX_SESSION'."
 else
     echo "Executando o script de treinamento diretamente..."
+    echo "Usando PyTorch com CUDA..."
     ssh -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "
         source ~/.zshrc &&
         cd $REMOTE_PATH &&
         python3 -m venv .venv &&
         source .venv/bin/activate &&
-        poetry install --with torch-cuda --no-root &&
+        poetry source add pytorch --priority=explicit &&
+        poetry source remove pytorch-cpu || true &&
+        poetry install --no-root &&
         chmod +x $SCRIPT_TO_RUN && ./train.sh --device cuda
     "
     echo "Treinamento iniciado sem tmux."
