@@ -1,7 +1,13 @@
 #!/bin/bash
 
+
+# Lista de datasets
+datasets=('cellcycle_GO' 'derisi_GO' 'eisen_GO' 'expr_GO' 'gasch1_GO'
+          'gasch2_GO' 'seq_GO' 'spo_GO' 'cellcycle_FUN' 'derisi_FUN'
+          'eisen_FUN' 'expr_FUN' 'gasch1_FUN' 'gasch2_FUN' 'seq_FUN' 'spo_FUN')
+
 # Definição de valores padrão para os parâmetros
-DATASET="seq_FUN"
+#DATASET="seq_FUN"
 DATASET_PATH="/home/bruno/storage/data/datasets"
 BATCH_SIZE=4
 LR=1e-4
@@ -59,25 +65,45 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
-# Loop para executar com diferentes seeds
-for SEED in 0
-do
-    python -m hmc.train.main \
-        --datasets "$DATASET" \
-        --dataset_path "$DATASET_PATH" \
-        --batch_size "$BATCH_SIZE" \
-        --lr "$LR" \
-        --dropout "$DROPOUT" \
-        --hidden_dim "$HIDDEN_DIM" \
-        --num_layers "$NUM_LAYERS" \
-        --weight_decay "$WEIGHT_DECAY" \
-        --non_lin "$NON_LIN" \
-        --device "$DEVICE" \
-        --num_epochs "$NUM_EPOCHS" \
-        --seed "$SEED" \
-        --output_path "$OUTPUT_PATH" \
-        --method "$METHOD" &
+# Número máximo de processos em paralelo
+MAX_JOBS=2
+current_jobs=0
+
+# Loop sobre os datasets
+for dataset in "${datasets[@]}"; do
+    # Loop para executar com diferentes seeds
+    for SEED in 0
+    do
+        echo "Running: python main.py --dataset $dataset --seed $seed --device 3"
+        # Controle de processos simultâneos
+        python -m hmc.train.main \
+            --datasets "$dataset" \
+            --dataset_path "$DATASET_PATH" \
+            --batch_size "$BATCH_SIZE" \
+            --lr "$LR" \
+            --dropout "$DROPOUT" \
+            --hidden_dim "$HIDDEN_DIM" \
+            --num_layers "$NUM_LAYERS" \
+            --weight_decay "$WEIGHT_DECAY" \
+            --non_lin "$NON_LIN" \
+            --device "$DEVICE" \
+            --num_epochs "$NUM_EPOCHS" \
+            --seed "$SEED" \
+            --output_path "$OUTPUT_PATH" \
+            --method "$METHOD" &
+
+        ((current_jobs++))
+
+        # Se o número de processos em execução atingir MAX_JOBS, esperar antes de continuar
+        if (( current_jobs >= MAX_JOBS )); then
+            wait -n  # Aguarda pelo menos um processo terminar antes de continuar
+            ((current_jobs--))  # Reduz o contador de processos em execução
+        fi
+
+    done
 done
 
-# Aguarda todos os processos terminarem antes de finalizar o script
+# Aguarda a execução de todos os processos restantes
 wait
+
+echo "All experiments completed!"
