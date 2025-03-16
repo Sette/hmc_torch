@@ -20,7 +20,7 @@ def train_globalPL(dataset_name, args):
     data, ontology = dataset_name.split('_')
 
     # Load dataset paths
-    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.devic, dataset_type='arff', is_global=True)
+    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type='arff', is_global=True)
     train, valid, test = hmc_dataset.get_datasets()
     to_eval = torch.as_tensor(train.to_eval, dtype=torch.bool).clone().detach()
 
@@ -40,7 +40,6 @@ def train_globalPL(dataset_name, args):
                         'non_lin': args.non_lin,
                         'hidden_dim': args.hidden_dim, 'lr': args.lr, 'weight_decay': args.weight_decay}
 
-    # R = hmc_dataset.compute_matrix_R().to(device)
     # Compute matrix of ancestors R
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is descendant of class j
     R = np.zeros(hmc_dataset.A.shape)
@@ -59,8 +58,7 @@ def train_globalPL(dataset_name, args):
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X, valid.X)))
     valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(
-        device), torch.tensor(
-        valid.Y).clone().detach().to(device)
+        device), torch.tensor(valid.Y).clone().detach().to(device)
 
     train.X, train.Y = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(
         device), torch.tensor(train.Y).clone().detach().to(device)
@@ -70,14 +68,27 @@ def train_globalPL(dataset_name, args):
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
+    if ('others' not in args.datasets):
+        val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
+        for (x, y) in zip(valid.X, valid.Y):
+            train_dataset.append((x, y))
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
-    valid_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
+    val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size=args.batch_size,
+                              shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset,
+                             batch_size=args.batch_size,
+                             shuffle=False)
+    val_loader = DataLoader(dataset=val_dataset,
+                             batch_size=args.batch_size,
+                             shuffle=False)
 
-    num_to_skip = 4 if 'GO' in dataset_name else 1
+    if 'GO' in dataset_name:
+        num_to_skip = 4
+    else:
+        num_to_skip = 1
 
     model = ConstrainedFFNNModelPL(
         input_dim=args.input_dims[data],
@@ -95,7 +106,7 @@ def train_globalPL(dataset_name, args):
         max_epochs=args.num_epochs,
         accelerator=args.device,
         log_every_n_steps=1,
-        callbacks=[EarlyStopping(monitor="val_score", patience=20, mode="max")]
+        callbacks=[EarlyStopping(monitor="train_loss", patience=20, mode="max")]
     )
 
     trainer.fit(model, train_loader, val_loader)

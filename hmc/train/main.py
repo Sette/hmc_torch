@@ -77,7 +77,7 @@ def main():
 
     for dataset_name in datasets:
         if args.method == "global":
-            train_global(dataset_name, args)
+            train_globalPL(dataset_name, args)
 
 
 if __name__ == "__main__":

@@ -99,20 +99,21 @@ class ConstrainedFFNNModelPL(LightningModule):
 
     def on_test_epoch_start(self):
         """Limpa a lista antes de cada época de teste."""
+        self.model.eval()
         self.test_outputs = []
 
     def training_step(self, batch, batch_idx):
-        x, labels = batch
-        x, labels = x.to(self.device), labels.to(self.device)
+        x, y = batch
+        x, y = x.to(self.device), y.to(self.device)
 
         output = self.model(x.float())
         constr_output = get_constr_out(output, self.R)
 
-        train_output = labels * output.double()
+        train_output = y * output.double()
         train_output = get_constr_out(train_output, self.R)
-        train_output = (1 - labels) * constr_output.double() + labels * train_output
+        train_output = (1 - y) * constr_output.double() + y * train_output
 
-        loss = self.criterion(train_output[:, self.to_eval], labels[:, self.to_eval])
+        loss = self.criterion(train_output[:, self.to_eval], y[:, self.to_eval])
         self.log("train_loss", loss, prog_bar=True, logger=True)
 
         return loss
@@ -148,7 +149,7 @@ class ConstrainedFFNNModelPL(LightningModule):
         constr_test = torch.cat([x["constr_output"] for x in self.test_outputs], dim=0)
         y_test = torch.cat([x["y"] for x in self.test_outputs], dim=0)
 
-        score = average_precision_score(y_test[:, self.to_eval].cpu(), constr_test.data[:, self.to_eval].cpu(), average="micro")
+        score = average_precision_score(y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro")
         self.log("test_score", score, prog_bar=True, logger=True)
 
         # 📁 Obtém o diretório do Lightning Logs
