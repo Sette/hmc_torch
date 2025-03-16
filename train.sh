@@ -66,7 +66,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Número máximo de processos em paralelo
-MAX_JOBS=2
+MAX_JOBS=6
 current_jobs=0
 
 # Loop sobre os datasets
