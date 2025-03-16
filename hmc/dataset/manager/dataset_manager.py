@@ -72,7 +72,6 @@ class HMCDatasetManager:
 
         # Ensure category labels exist before evaluation filtering
         self.to_eval = [t not in self.to_skip for t in self.nodes]
-        self.to_eval = torch.tensor(self.to_eval, dtype=torch.bool).clone().detach()
 
 
     def load_structure_from_json(self, labels_json):
