@@ -109,5 +109,5 @@ def train_globalPL(dataset_name, args):
         callbacks=[EarlyStopping(monitor="train_loss", patience=20, mode="max")]
     )
 
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader)
     trainer.test(model, test_loader)
