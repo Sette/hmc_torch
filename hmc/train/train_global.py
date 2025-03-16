@@ -31,7 +31,7 @@ def train_global(dataset_name, args):
         args.lr = args.lrs[ontology][data]
         args.num_epochs = args.epochss[ontology][data]
         args.weight_decay =  1e-5
-        args.batch_size = 4
+        args.batch_size = 64
         args.num_layers = 3
         args.dropout = 0.7
         args.non_lin = 'relu'
