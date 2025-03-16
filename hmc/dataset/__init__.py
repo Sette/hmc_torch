@@ -1,1 +1,2 @@
-from hmc.dataset.dataset import GOFUNDataset, HMCDataset, initialize_dataset, impute_scaler
+from hmc.dataset.datasets.gofun import  HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
+from hmc.dataset.manager.dataset_manager import HMCDatasetManager, initialize_dataset_experiments

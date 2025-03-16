@@ -5,8 +5,7 @@ import sys
 from datetime import UTC
 from datetime import datetime as dt
 from hmc.utils.dir import create_dir, create_job_id
-from hmc.model.train import train
-from hmc.model import train_constraint
+from hmc.model import train
 
 # %%
 base_path = "/home/bruno/storage/data/fma/trains"
@@ -45,19 +44,20 @@ sys.argv = [
 
 sys.argv = [
 'script.py',
-'--dataset', 'seq_GO', 'derisi_GO', 'gasch1_GO', 'cellcycle_FUN',
-'--dataset_path', '/home/bruno/storage/data/go_fun',
+'--datasets', 'seq_FUN',
+'--dataset_path', '/home/bruno/storage/data/datasets',
 '--batch_size', '32',
-'--lr', '1e-5',
+'--lr', '1e-4',
 '--dropout', '0.7',
-'--hidden_dim', '50',
-'--num_layers', '2',
+'--hidden_dim', '250',
+'--num_layers', '3',
 '--weight_decay', '1e-5',
 '--non_lin', 'relu',
-'--device', '0',
+'--device', 'cuda',
 '--num_epochs', '2000',
 '--seed', '0',
-'--output_path', '/home/bruno/storage/models/gofun'
+'--output_path', '/home/bruno/storage/models/gofun',
+'--method', 'global'
 ]
 
 # %%
@@ -65,7 +65,7 @@ sys.argv = [
 time_start = dt.now(UTC)
 print("Experiment started at {}".format(time_start.strftime("%H:%M:%S")))
 print(".......................................")
-df_predict = train_constraint()
+train()
 time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
