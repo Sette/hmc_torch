@@ -37,7 +37,7 @@ class HMCDatasetManager:
 
     def __init__(self, dataset, dataset_type='csv', device='cpu', is_global=False):
         # Extract dataset paths
-        self.test, self.train, self.valid = None, None, None
+        self.test, self.train, self.valid, self.to_eval = None, None, None, None
         self.levels, self.levels_size,  self.nodes_idx, self.local_nodes_idx = {}, {}, {}, {}
         self.labels, self.roots, self.nodes, self.g_t, self.A = [], [], [], [], []
         self.to_skip = to_skip
@@ -64,14 +64,17 @@ class HMCDatasetManager:
 
         if dataset_type == 'csv':
             self.load_csv_data()
+            self.to_eval = [t not in self.to_skip for t in self.nodes]
         elif dataset_type == 'torch':
             self.load_torch_data()
+            self.to_eval = [t not in self.to_skip for t in self.nodes]
         elif dataset_type == 'arff':
             self.load_arff_data()
+            self.to_eval = self.train.to_eval
 
 
         # Ensure category labels exist before evaluation filtering
-        self.to_eval = [t not in self.to_skip for t in self.nodes]
+        #self.to_eval = [t not in self.to_skip for t in self.nodes]
 
 
     def load_structure_from_json(self, labels_json):

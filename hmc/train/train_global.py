@@ -22,7 +22,7 @@ def train_global(dataset_name, args):
 
     hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type='arff', is_global=True)
     train, valid, test = hmc_dataset.get_datasets()
-    to_eval = torch.as_tensor(train.to_eval, dtype=torch.bool).clone().detach()
+    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
 
     experiment = True
 
@@ -31,7 +31,7 @@ def train_global(dataset_name, args):
         args.lr = args.lrs[ontology][data]
         args.num_epochs = args.epochss[ontology][data]
         args.weight_decay =  1e-5
-        args.batch_size = 16
+        args.batch_size = 4
         args.num_layers = 3
         args.dropout = 0.7
         args.non_lin = 'relu'
