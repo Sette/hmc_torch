@@ -1,16 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-import os
 
-import torch.nn.functional as F
-from hmc.dataset import HMCDataset
 from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs, custom_optimizers
-
-import lightning as L
-from torch.utils.data import DataLoader
-from sklearn.metrics import average_precision_score
-from hmc.utils.dir import create_dir
 
 
 def transform_predictions(predictions):
@@ -71,19 +63,16 @@ class BuildClassification(nn.Module):
                     init.constant_(m.bias, 0)
 
 
-class LocalbyLevelModel(nn.Module):
-    def __init__(self, levels_size, input_size=1280, hidden_size=640, dropouts=None, thresholds=None, optimizers=None , lrs=None):
-        super().__init__()
+class HMCLocalClassificationModel(nn.Module):
+    def __init__(self, levels_size, input_size=1280, hidden_size=640, hyperparams={}):
+        super(HMCLocalClassificationModel, self).__init__()
         self.input_size = input_size
         self.levels_size = levels_size
-        self.dropouts = dropouts if dropouts is not None else custom_dropouts(len(levels_size))
-        self.thresholds = thresholds if thresholds is not None else custom_thresholds(len(levels_size))
-        self.lrs = lrs if lrs is not None else custom_lrs(len(levels_size))
-        self.optimizers = optimizers if optimizers is not None else custom_optimizers(len(levels_size))
+        print(levels_size)
         self.levels = nn.ModuleList()
         self.output_normalization = nn.ModuleList()
         next_size = 0
-        for level_size in levels_size:
+        for level_size in levels_size.values():
             self.levels.append(BuildClassification(input_size + next_size, hidden_size, level_size))
             self.output_normalization.append(OutputNormalization())
             next_size = level_size
@@ -100,7 +89,7 @@ class LocalbyLevelModel(nn.Module):
             outputs.append(local_output)
             current_output = self.output_normalization[i](local_output)
         return outputs
-    
+    '''
     def predict(self, base_path, batch_size=64):
         torch_path = os.path.join(base_path, 'torch')
         test_torch_path = os.path.join(torch_path, 'test')
@@ -140,4 +129,4 @@ class LocalbyLevelModel(nn.Module):
 
         #df_test['predictions'] = output_list
         return predictions
-    
+    '''

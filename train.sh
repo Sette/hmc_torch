@@ -19,7 +19,7 @@ NON_LIN="relu"
 DEVICE="cuda"
 NUM_EPOCHS=13
 OUTPUT_PATH="/home/bruno/storage/models/gofun"
-METHOD="global"
+METHOD="local"
 
 # Função para exibir ajuda
 usage() {

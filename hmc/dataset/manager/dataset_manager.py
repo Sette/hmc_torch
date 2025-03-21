@@ -7,7 +7,7 @@ from hmc.utils import __load_json__
 from hmc.dataset.datasets.gofun import get_dataset_paths
 
 from hmc.dataset.datasets.gofun import to_skip
-
+from collections import defaultdict
 from hmc.dataset import  HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
 
 # Configurar o logger
@@ -37,7 +37,7 @@ class HMCDatasetManager:
 
     def __init__(self, dataset, dataset_type='csv', device='cpu', is_global=False):
         # Extract dataset paths
-        self.test, self.train, self.valid, self.to_eval = None, None, None, None
+        self.test, self.train, self.valid, self.to_eval, self.max_depth = None, None, None, None, None
         self.levels, self.levels_size,  self.nodes_idx, self.local_nodes_idx = {}, {}, {}, {}
         self.labels, self.roots, self.nodes, self.g_t, self.A = [], [], [], [], []
         self.to_skip = to_skip
@@ -71,6 +71,9 @@ class HMCDatasetManager:
         elif dataset_type == 'arff':
             self.load_arff_data()
             self.to_eval = self.train.to_eval
+            self.nodes = self.train.terms
+            if not self.is_global:
+                self.get_hierarchy_levels()
 
 
         # Ensure category labels exist before evaluation filtering
@@ -100,21 +103,27 @@ class HMCDatasetManager:
         #nx.write_graphml(self.g, self.graph_path)
 
         self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
-        if not self.is_global:
-            self.get_hierarchy_levels()
+
 
     def get_hierarchy_levels(self):
         """
         Retorna um dicionário com os nós agrupados por nível na hierarquia.
         """
-        level_by_node = nx.shortest_path_length(self.g_t, "root")
+        self.levels_size = defaultdict(int)
+        self.levels = defaultdict(list)
+        #level_by_node = nx.shortest_path_length(self.g_t, "root")
+        #
+        # for node in self.g.nodes():
+        #     depth = level_by_node.get(node)
+        #     if depth not in self.levels:
+        #         self.levels[depth] = []
+        #     self.levels[depth].append(node)
+        for label in self.nodes:
+            level = label.count('.')  # Count the number of '.' to determine the level
+            self.levels[level].append(label)
+            self.levels_size[level] += 1
 
-        for node in self.g.nodes():
-            depth = level_by_node.get(node)
-            if depth not in self.levels:
-                self.levels[depth] = []
-            self.levels[depth].append(node)
-        self.levels_size = {key: len(value) for key, value in self.levels.items()}
+        self.max_depth = len(self.levels_size)
         print(self.levels_size)
         self.local_nodes_idx = {idx: dict(zip(level_nodes, range(len(level_nodes)))) for idx, level_nodes in
                                 self.levels.items()}

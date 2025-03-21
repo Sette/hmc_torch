@@ -2,87 +2,125 @@ import json
 import os
 
 import torch
+from tensorflow.python.layers.core import dropout
 from torch.utils.data import DataLoader
 import torch.nn as nn
 
 from hmc.model import HMCLocalClassificationModel
-from hmc.dataset import HMCDataset
+
 from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.utils.dir import create_job_id, create_dir
 from hmc.model.arguments import get_parser
+from sklearn import preprocessing
+from sklearn.impute import SimpleImputer
+from hmc.utils import create_dir
+from hmc.dataset.manager import initialize_dataset_experiments
 
 
-def train_local():
-    print("========================= PyTorch =========================")
-    print("GPUs available: {}".format(torch.cuda.device_count()))
-    print("===========================================================")
+from sklearn.metrics import average_precision_score
+from hmc.model.global_classifier import ConstrainedFFNNModel, get_constr_out
+from sklearn import preprocessing
+from sklearn.impute import SimpleImputer
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import torch.nn as nn
+import numpy as np
 
-    job_id = create_job_id()
-    print(f"Job ID: {job_id}")
 
-    parser = get_parser()
-    args = parser.parse_args()
+def train_local(dataset_name, args):
+    print(".......................................")
+    print("Experiment with {} dataset ".format(dataset_name))
+    # Load train, val and test set
+    device = torch.device(args.device)
+    data, ontology = dataset_name.split('_')
 
-    dropouts = [float(rate) for rate in args.dropouts]
-    thresholds = [float(threshold) for threshold in args.thresholds]
+    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type='arff', is_global=False)
+    train, valid, test = hmc_dataset.get_datasets()
+    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
+    dropouts = None
+    thresholds = None
+    experiment = True
 
-    metadata_path = os.path.join(args.input_path, 'metadata.json')
-    labels_path = os.path.join(args.input_path, 'labels.json')
+    if experiment:
+        args.hidden_dim= args.hidden_dims[ontology][data]
+        args.lr = args.lrs[ontology][data]
+        args.num_epochs = args.epochss[ontology][data]
+        args.weight_decay =  1e-5
+        args.batch_size = 4
+        args.num_layers = 3
+        args.dropout = 0.7
+        args.non_lin = 'relu'
 
-    with open(metadata_path, 'r') as f:
-        metadata = json.loads(f.read())
+    args.hyperparams = {'batch_size': args.batch_size, 'num_layers': args.num_layers, 'dropout': args.dropout, 'non_lin': args.non_lin,
+                   'hidden_dim': args.hidden_dim, 'lr': args.lr, 'weight_decay': args.weight_decay}
 
-    with open(labels_path, 'r') as f:
-        labels = json.loads(f.read())
+    scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X, valid.X)))
+    valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(
+        device), torch.tensor(valid.Y).clone().detach().to(device)
+
+    train.X, train.Y = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(
+        device), torch.tensor(train.Y).clone().detach().to(device)
+    test.X, test.Y = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(
+        device), torch.as_tensor(test.Y).clone().detach().to(
+        device)
+
+    # Create loaders
+    train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
+    if ('others' not in args.datasets):
+        val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
+        for (x, y) in zip(valid.X, valid.Y):
+            train_dataset.append((x, y))
+    test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
+
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size=args.batch_size,
+                              shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset,
+                             batch_size=args.batch_size,
+                             shuffle=False)
+
+    num_epochs = args.num_epochs
+    if 'GO' in dataset_name:
+        num_to_skip = 4
+    else:
+        num_to_skip = 1
+
 
     params = {
-        'levels_size': labels['levels_size'],
-        'input_size': metadata['sequence_size'],
-        'dropouts': dropouts,
-        'thresholds': thresholds
+        'levels_size': hmc_dataset.levels_size,
+        'input_size': args.input_dims[data]
     }
 
-    assert len(args.dropouts) == metadata['max_depth']
-    assert len(args.lrs) == metadata['max_depth']
-
     model = HMCLocalClassificationModel(**params)
+    print(model)
+
+    # Create the model
+    # model = HMCLocalClassificationModel(levels_size=hmc_dataset.levels_size,
+    #                                     input_size=args.input_dims[data],
+    #                                     hidden_size=args.hidden_dim)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
 
-    criterions = [nn.BCEWithLogitsLoss(reduction='sum') for _ in labels['levels_size']]
+    criterions = [nn.BCEWithLogitsLoss(reduction='sum') for _ in hmc_dataset.levels_size]
 
     if torch.cuda.is_available():
-        model = model.to('cuda')
+        model = model.to(device)
         criterions = [criterion.to('cuda') for criterion in criterions]
-        
 
-    torch_path = os.path.join(args.input_path, 'torch')
-    metadata['train_torch_path'] = os.path.join(torch_path, 'train')
-    metadata['val_torch_path'] = os.path.join(torch_path, 'val')
-    metadata['test_torch_path'] = os.path.join(torch_path, 'test')
-
-    ds_train = HMCDataset(metadata['train_torch_path'], params['levels_size'])
-    ds_validation = HMCDataset(metadata['val_torch_path'], params['levels_size'])
-
-    train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(ds_validation, batch_size=args.batch_size, shuffle=False)
-
-    assert isinstance(args.output_path, str)
-    model_path: str = os.path.join(args.output_path, 'jobs' ,job_id)
-    create_dir(model_path)
-
-    early_stopping_patience = args.patience
+    early_stopping_patience = 20
     best_val_loss = float('inf')
     patience_counter = 0
 
-    for epoch in range(1, args.epochs+1):
+    for epoch in range(1, args.epochs + 1):
         model.train()
-        local_train_losses = [0.0 for _ in range(metadata['max_depth'])]
+        local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
         for inputs, targets in train_loader:
             if torch.cuda.is_available():
                 inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
-            outputs = model(inputs)
-            
+            outputs = model(inputs.float())
+
             # Zerar os gradientes antes de cada batch
             optimizer.zero_grad()
 
@@ -94,20 +132,20 @@ def train_local():
 
         # Backward pass (cálculo dos gradientes)
         total_loss.backward()
-        
+
         optimizer.step()
 
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
-        global_train_loss = sum(local_train_losses) / metadata['max_depth']
+        global_train_loss = sum(local_train_losses) / hmc_dataset.max_depth
 
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_train_losses, set='Train')
         show_global_loss(global_train_loss, set='Train')
-            
+
         model.eval()
-        local_val_losses = [0.0 for _ in range(metadata['max_depth'])]
+        local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
         with torch.no_grad():
-            for inputs, targets in val_loader:
+            for inputs, targets in test_loader:
                 if torch.cuda.is_available():
                     inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
                 outputs = model(inputs)
@@ -116,10 +154,10 @@ def train_local():
                 for index, (output, target) in enumerate(zip(outputs, targets)):
                     loss = criterions[index](output, target)
                     total_val_loss += loss
-                    local_val_losses[index] += loss.item() 
+                    local_val_losses[index] += loss.item()
 
-        local_val_losses = [loss / len(val_loader) for loss in local_val_losses]
-        global_val_loss = sum(local_val_losses) / metadata['max_depth']
+        local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
+        global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
 
         print(f'Epoch {epoch}/{args.epochs}')
         show_local_losses(local_val_losses, set='Val')
@@ -129,13 +167,14 @@ def train_local():
         if current_val_loss <= best_val_loss - 2e-4:
             best_val_loss = current_val_loss
             print('new best model')
-            torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
+            #torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
         else:
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
                 return None
-            
+
             patience_counter += 1
     return None
+
 
 
