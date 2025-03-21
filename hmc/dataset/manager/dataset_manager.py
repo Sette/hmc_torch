@@ -70,10 +70,8 @@ class HMCDatasetManager:
             self.to_eval = [t not in self.to_skip for t in self.nodes]
         elif dataset_type == 'arff':
             self.load_arff_data()
-            self.to_eval = self.train.to_eval
-            self.nodes = self.train.terms
-            if not self.is_global:
-                self.get_hierarchy_levels()
+
+
 
 
         # Ensure category labels exist before evaluation filtering
@@ -219,6 +217,12 @@ class HMCDatasetManager:
         self.valid = HMCDatasetArff(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetArff(self.test_file, is_go=self.is_go)
         self.A = self.train.A
+        self.to_eval = self.train.to_eval
+        self.nodes = self.train.g.nodes()
+        self.local_nodes_idx = self.train.local_nodes_idx
+        self.max_depth = self.train.max_depth
+        self.levels = self.train.levels
+        self.levels_size = self.train.levels_size
 
     def get_datasets(self):
         return self.train, self.valid, self.test

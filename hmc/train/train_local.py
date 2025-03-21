@@ -16,7 +16,6 @@ from sklearn.impute import SimpleImputer
 from hmc.utils import create_dir
 from hmc.dataset.manager import initialize_dataset_experiments
 
-
 from sklearn.metrics import average_precision_score
 from hmc.model.global_classifier import ConstrainedFFNNModel, get_constr_out
 from sklearn import preprocessing
@@ -45,7 +44,7 @@ def train_local(dataset_name, args):
     if experiment:
         args.hidden_dim= args.hidden_dims[ontology][data]
         args.lr = args.lrs[ontology][data]
-        args.num_epochs = args.epochss[ontology][data]
+        #args.num_epochs = args.epochss[ontology][data]
         args.weight_decay =  1e-5
         args.batch_size = 4
         args.num_layers = 3
@@ -57,22 +56,25 @@ def train_local(dataset_name, args):
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean').fit(np.concatenate((train.X, valid.X)))
-    valid.X, valid.Y = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(
-        device), torch.tensor(valid.Y).clone().detach().to(device)
-
-    train.X, train.Y = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(
-        device), torch.tensor(train.Y).clone().detach().to(device)
-    test.X, test.Y = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(
-        device), torch.as_tensor(test.Y).clone().detach().to(
+    valid.X = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(
         device)
 
-    # Create loaders
-    train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
+    train.X = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(device)
+    test.X = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(device)
+
+    #test.Y = torch.as_tensor(test.Y).clone().detach().to(device)
+    #valid.Y = torch.tensor(valid.Y).clone().detach().to(device)
+    #train.Y =  torch.tensor(train.Y).clone().detach().to(device)
+
+    # Create loaders using local (per-level) y labels
+    train_dataset = [(x, y_levels) for (x, y_levels) in zip(train.X, train.Y_local)]
+
+    # Optionally extend train with validation
     if ('others' not in args.datasets):
-        val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
-        for (x, y) in zip(valid.X, valid.Y):
-            train_dataset.append((x, y))
-    test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
+        val_dataset = [(x, y_levels) for (x, y_levels) in zip(valid.X, valid.Y_local)]
+        train_dataset.extend(val_dataset)
+
+    test_dataset = [(x, y_levels) for (x, y_levels) in zip(test.X, test.Y_local)]
 
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=args.batch_size,
@@ -95,7 +97,6 @@ def train_local(dataset_name, args):
 
     model = HMCLocalClassificationModel(**params)
     print(model)
-
     # Create the model
     # model = HMCLocalClassificationModel(levels_size=hmc_dataset.levels_size,
     #                                     input_size=args.input_dims[data],
@@ -110,10 +111,10 @@ def train_local(dataset_name, args):
         criterions = [criterion.to('cuda') for criterion in criterions]
 
     early_stopping_patience = 20
-    best_val_loss = float('inf')
+    best_train_loss = float('inf')
     patience_counter = 0
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(1, args.num_epochs + 1):
         model.train()
         local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
         for inputs, targets in train_loader:
@@ -137,43 +138,41 @@ def train_local(dataset_name, args):
 
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
         global_train_loss = sum(local_train_losses) / hmc_dataset.max_depth
-
-        print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_train_losses, set='Train')
-        show_global_loss(global_train_loss, set='Train')
-
-        model.eval()
-        local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
-        with torch.no_grad():
-            for inputs, targets in test_loader:
-                if torch.cuda.is_available():
-                    inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
-                outputs = model(inputs)
-
-                total_val_loss = 0.0
-                for index, (output, target) in enumerate(zip(outputs, targets)):
-                    loss = criterions[index](output, target)
-                    total_val_loss += loss
-                    local_val_losses[index] += loss.item()
-
-        local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
-        global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
-
-        print(f'Epoch {epoch}/{args.epochs}')
-        show_local_losses(local_val_losses, set='Val')
-        show_global_loss(global_val_loss, set='Val')
-
-        current_val_loss = round(global_val_loss, 4)
-        if current_val_loss <= best_val_loss - 2e-4:
-            best_val_loss = current_val_loss
+        current_train_loss = round(global_train_loss, 4)
+        if current_train_loss <= best_train_loss - 2e-4:
+            best_train_loss = current_train_loss
             print('new best model')
-            #torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
+            # torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
         else:
             if patience_counter >= early_stopping_patience:
                 print("Early stopping triggered")
                 return None
 
             patience_counter += 1
+
+        print(f'Epoch {epoch}/{args.num_epochs}')
+        show_local_losses(local_train_losses, set='Train')
+        show_global_loss(global_train_loss, set='Train')
+
+    model.eval()
+    local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+    with torch.no_grad():
+        for inputs, targets in test_loader:
+            if torch.cuda.is_available():
+                inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
+            outputs = model(inputs.float())
+
+            total_val_loss = 0.0
+            for index, (output, target) in enumerate(zip(outputs, targets)):
+                loss = criterions[index](output, target)
+                total_val_loss += loss
+                local_val_losses[index] += loss.item()
+        #score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
+
+    local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
+    global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
+
+
     return None
 
 

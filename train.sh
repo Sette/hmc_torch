@@ -17,7 +17,7 @@ NUM_LAYERS=3
 WEIGHT_DECAY=1e-5
 NON_LIN="relu"
 DEVICE="cuda"
-NUM_EPOCHS=13
+NUM_EPOCHS=200
 OUTPUT_PATH="/home/bruno/storage/models/gofun"
 METHOD="local"
 

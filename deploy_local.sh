@@ -60,7 +60,7 @@ else
         chmod +x train.sh
     fi
 
-    if [ "$INSTALL_CHOICE" = "y" ] && [ "$PYTORCH_MODE" = "cuda" ]; then
+    if [ "$INSTALL_CHOICE" = "y" ] && [ "$PYTORCH_MODE" = "cpu" ]; then
         python3 -m venv .venv &&
         source .venv/bin/activate &&
         poetry source add pytorch-cpu https://download.pytorch.org/whl/cpu --priority=explicit &&

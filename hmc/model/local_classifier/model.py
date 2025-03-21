@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-
+import torch.nn.functional as F
 from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs, custom_optimizers
 
 
