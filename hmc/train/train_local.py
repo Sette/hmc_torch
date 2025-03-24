@@ -62,19 +62,19 @@ def train_local(dataset_name, args):
     train.X = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(device)
     test.X = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(device)
 
-    #test.Y = torch.as_tensor(test.Y).clone().detach().to(device)
-    #valid.Y = torch.tensor(valid.Y).clone().detach().to(device)
-    #train.Y =  torch.tensor(train.Y).clone().detach().to(device)
+    test.Y = torch.as_tensor(test.Y).clone().detach().to(device)
+    valid.Y = torch.tensor(valid.Y).clone().detach().to(device)
+    train.Y =  torch.tensor(train.Y).clone().detach().to(device)
 
     # Create loaders using local (per-level) y labels
-    train_dataset = [(x, y_levels) for (x, y_levels) in zip(train.X, train.Y_local)]
+    train_dataset = [(x, y_levels, y) for (x, y_levels, y) in zip(train.X, train.Y_local, train.Y)]
 
     # Optionally extend train with validation
     if ('others' not in args.datasets):
-        val_dataset = [(x, y_levels) for (x, y_levels) in zip(valid.X, valid.Y_local)]
+        val_dataset = [(x, y_levels, y) for (x, y_levels, y) in zip(valid.X, valid.Y_local, valid.Y)]
         train_dataset.extend(val_dataset)
 
-    test_dataset = [(x, y_levels) for (x, y_levels) in zip(test.X, test.Y_local)]
+    test_dataset = [(x, y_levels, y) for (x, y_levels, y) in zip(test.X, test.Y_local, train.Y)]
 
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=args.batch_size,
@@ -117,7 +117,7 @@ def train_local(dataset_name, args):
     for epoch in range(1, args.num_epochs + 1):
         model.train()
         local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
-        for inputs, targets in train_loader:
+        for inputs, targets, _ in train_loader:
             if torch.cuda.is_available():
                 inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
             outputs = model(inputs.float())
@@ -156,8 +156,10 @@ def train_local(dataset_name, args):
 
     model.eval()
     local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+    local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
+    local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
     with torch.no_grad():
-        for inputs, targets in test_loader:
+        for inputs, targets, global_targets  in test_loader:
             if torch.cuda.is_available():
                 inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
             outputs = model(inputs.float())
@@ -167,11 +169,18 @@ def train_local(dataset_name, args):
                 loss = criterions[index](output, target)
                 total_val_loss += loss
                 local_val_losses[index] += loss.item()
-        #score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
+                output = output.to('cpu')
+                target = target.to('cpu')
+                local_inputs[index].append(target)
+                local_outputs[index].append(output)
 
+
+    local_val_score = [average_precision_score(torch.cat(target, dim=0), torch.cat(output, dim=0), average='micro') for target, output in zip(local_inputs, local_outputs)]
+    # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
     local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
     global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
-
+    print(f'Local test score: {local_val_score}')
+    print(f'Global test loss:{global_val_loss}')
 
     return None
 
