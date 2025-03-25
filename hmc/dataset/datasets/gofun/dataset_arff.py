@@ -18,7 +18,7 @@ def get_depth_by_root(g_t, t, roots):
 class HMCDatasetArff():
     def __init__(self, arff_file, is_go):
         self.arff_file = arff_file
-        self.X, self.Y, self.Y_local, self.A, self.terms, self.g, self.levels, self.levels_size, self.local_nodes_idx, self.max_depth = parse_arff(arff_file=arff_file, is_go=is_go)
+        self.X, self.Y, self.Y_local, self.A, self.terms, self.g, self.levels, self.levels_size, self.nodes_idx, self.local_nodes_idx, self.max_depth = parse_arff(arff_file=arff_file, is_go=is_go)
         self.to_eval = [t not in to_skip for t in self.terms]
         r_, c_ = np.where(np.isnan(self.X))
         m = np.nanmean(self.X, axis=0)
@@ -112,5 +112,5 @@ def parse_arff(arff_file, is_go=False):
         X = np.array(X)
         Y = np.stack(Y)
 
-        return X, Y, Y_local , np.array(nx.to_numpy_array(g, nodelist=nodes)), nodes, g, levels, levels_size, local_nodes_idx, max_depth
+        return X, Y, Y_local , np.array(nx.to_numpy_array(g, nodelist=nodes)), nodes, g, levels, levels_size, nodes_idx , local_nodes_idx, max_depth
 

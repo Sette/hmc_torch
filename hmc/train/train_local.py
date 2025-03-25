@@ -1,19 +1,6 @@
-import json
-import os
-
-import torch
-from tensorflow.python.layers.core import dropout
-from torch.utils.data import DataLoader
-import torch.nn as nn
-
 from hmc.model import HMCLocalClassificationModel
 
 from hmc.model.losses import show_global_loss, show_local_losses
-from hmc.utils.dir import create_job_id, create_dir
-from hmc.model.arguments import get_parser
-from sklearn import preprocessing
-from sklearn.impute import SimpleImputer
-from hmc.utils import create_dir
 from hmc.dataset.manager import initialize_dataset_experiments
 
 from sklearn.metrics import average_precision_score
@@ -26,6 +13,19 @@ from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
 
+
+# Converter local -> global
+def local_to_global_predictions(local_preds, local_nodes_idx, nodes_idx):
+    n_samples = local_preds[0].shape[0]
+    n_global_labels = len(nodes_idx)
+    global_preds = np.zeros((n_samples, n_global_labels))
+
+    for level, label_to_local_idx in local_nodes_idx.items():
+        for node_name, local_idx in label_to_local_idx.items():
+            global_idx = nodes_idx[node_name.replace('/', '.')]
+            global_preds[:, global_idx] = local_preds[level][:, local_idx]
+
+    return global_preds
 
 def train_local(dataset_name, args):
     print(".......................................")
@@ -110,13 +110,21 @@ def train_local(dataset_name, args):
         model = model.to(device)
         criterions = [criterion.to('cuda') for criterion in criterions]
 
-    early_stopping_patience = 20
-    best_train_loss = float('inf')
-    patience_counter = 0
+    early_stopping_patience = 3
+    best_train_losses = [float('inf')] * hmc_dataset.max_depth
+    patience_counters = [0] * hmc_dataset.max_depth
+    level_active = [True] * hmc_dataset.max_depth
+
 
     for epoch in range(1, args.num_epochs + 1):
         model.train()
         local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+        active_levels = [i for i, active in enumerate(level_active) if active]
+
+        if not active_levels:
+            print("All levels have triggered early stopping.")
+            break
+
         for inputs, targets, _ in train_loader:
             if torch.cuda.is_available():
                 inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
@@ -126,29 +134,37 @@ def train_local(dataset_name, args):
             optimizer.zero_grad()
 
             total_loss = 0.0
-            for index, (output, target) in enumerate(zip(outputs, targets)):
+            for index in active_levels:
+                output = outputs[index]
+                target = targets[index]
                 loss = criterions[index](output, target)
                 total_loss += loss
                 local_train_losses[index] += loss.item()
 
         # Backward pass (cálculo dos gradientes)
         total_loss.backward()
-
         optimizer.step()
 
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
         global_train_loss = sum(local_train_losses) / hmc_dataset.max_depth
-        current_train_loss = round(global_train_loss, 4)
-        if current_train_loss <= best_train_loss - 2e-4:
-            best_train_loss = current_train_loss
-            print('new best model')
-            # torch.save(model.state_dict(), os.path.join(model_path, f'best_binary-{epoch}.pth'))
-        else:
-            if patience_counter >= early_stopping_patience:
-                print("Early stopping triggered")
-                return None
+        current_train_loss = round(global_train_loss, 3)
 
-            patience_counter += 1
+        print(f'\nEpoch {epoch}/{args.num_epochs}')
+
+        for i in active_levels:
+            if local_train_losses[i] < round(best_train_losses[i], 3):
+                best_train_losses[i] = round(best_train_losses[i], 3)
+                patience_counters[i] = 0
+                print(f"Level {i}: improved (loss={local_train_losses[i]:.4f})")
+            else:
+                patience_counters[i] += 1
+                print(f"Level {i}: no improvement (patience {patience_counters[i]}/{early_stopping_patience})")
+                if patience_counters[i] >= early_stopping_patience:
+                    level_active[i] = False
+                    print(f"🚫 Early stopping triggered for level {i} — freezing its parameters")
+                    # ❄️ Congelar os parâmetros desse nível
+                    for param in model.levels[i].parameters():
+                        param.requires_grad = False
 
         print(f'Epoch {epoch}/{args.num_epochs}')
         show_local_losses(local_train_losses, set='Train')
@@ -158,10 +174,13 @@ def train_local(dataset_name, args):
     local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
     local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
     local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
-    with torch.no_grad():
+    Y_true_global = []
+    with ((torch.no_grad())):
         for inputs, targets, global_targets  in test_loader:
             if torch.cuda.is_available():
-                inputs, targets = inputs.to('cuda'), [target.to('cuda') for target in targets]
+                inputs = inputs.to('cuda')
+                targets = [target.to('cuda') for target in targets]
+                global_targets = global_targets.to('cpu')
             outputs = model(inputs.float())
 
             total_val_loss = 0.0
@@ -169,18 +188,45 @@ def train_local(dataset_name, args):
                 loss = criterions[index](output, target)
                 total_val_loss += loss
                 local_val_losses[index] += loss.item()
-                output = output.to('cpu')
+                predicted = output.data > 0.5
+                predicted = predicted.to('cpu')
                 target = target.to('cpu')
                 local_inputs[index].append(target)
-                local_outputs[index].append(output)
+                local_outputs[index].append(predicted)
+            Y_true_global.append(global_targets)
+        # Concat all outputs and targets by level
+    local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
+    local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
+    # Calcular score local
+    #local_val_score = [
+    #    average_precision_score(target, output, average='micro')
+    #    for target, output in zip(local_inputs, local_outputs)
+    #]
+    # Concat global targets
+    Y_true_global = torch.cat(Y_true_global, dim=0).numpy()
 
-    local_val_score = [average_precision_score(torch.cat(target, dim=0), torch.cat(output, dim=0), average='micro') for target, output in zip(local_inputs, local_outputs)]
-    # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
+    # Gerar predições e targets globais
+    Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
+
+    #print(f'Labels verdadeiras: {Y_true_global[0]}')
+    #print(f'Labels preditas: {Y_pred_global[0]}')
+    print(f'Shape Y_true global: {Y_true_global.shape}')
+    print(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
+    # Score global
+    global_score = average_precision_score(Y_true_global[:, to_eval], Y_pred_global[:, to_eval], average='micro')
+
     local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
     global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
-    print(f'Local test score: {local_val_score}')
-    print(f'Global test loss:{global_val_loss}')
+
+    #print(f'Local test score: {local_val_score}')
+    print(f'Global test score: {global_score}')
+    #print(f'Global test loss: {global_val_loss}')
+    # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
+    #local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
+    #global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
+    #print(f'Local test score: {local_val_score}')
+    #print(f'Global test loss:{global_val_loss}')
 
     return None
 
