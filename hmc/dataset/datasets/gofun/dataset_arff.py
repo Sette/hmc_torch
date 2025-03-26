@@ -90,7 +90,6 @@ def parse_arff(arff_file, is_go=False):
                 lab = d_line[len(feature_types)].strip()
 
                 X.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[:len(feature_types)])])))
-                to_skip = [skip for skip in to_skip if skip in g.nodes()]
 
                 for t in lab.split('@'):
                     y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1
@@ -103,8 +102,9 @@ def parse_arff(arff_file, is_go=False):
 
                     y_local_[depth-1][local_nodes_idx[depth-1].get(t.replace('/', '.'))] = 1
                     for ancestor in nx.ancestors(g_t, t.replace('/', '.')):
-                        if ancestor != "root":
+                        if ancestor not in  to_skip:
                             depth = nx.shortest_path_length(g, ancestor , "root")
+                            y_local_[depth - 1][local_nodes_idx[depth - 1].get(t.replace('/', '.'))] = 1
                             y_local_[depth-1][local_nodes_idx[depth-1].get(ancestor)] = 1
 
                 Y.append(y_)

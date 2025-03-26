@@ -152,8 +152,8 @@ def train_local(dataset_name, args):
         print(f'\nEpoch {epoch}/{args.num_epochs}')
 
         for i in active_levels:
-            if local_train_losses[i] < round(best_train_losses[i], 3):
-                best_train_losses[i] = round(best_train_losses[i], 3)
+            if round(local_train_losses[i], 3) < round(best_train_losses[i], 3):
+                best_train_losses[i] = round(local_train_losses[i], 3)
                 patience_counters[i] = 0
                 print(f"Level {i}: improved (loss={local_train_losses[i]:.4f})")
             else:
@@ -199,33 +199,36 @@ def train_local(dataset_name, args):
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
     # Calcular score local
-    #local_val_score = [
-    #    average_precision_score(target, output, average='micro')
-    #    for target, output in zip(local_inputs, local_outputs)
-    #]
+    local_val_score = [
+        average_precision_score(target, output, average='micro')
+        for target, output in zip(local_inputs, local_outputs)
+    ]
+    print(f'Local test score: {local_val_score}')
     # Concat global targets
-    Y_true_global = torch.cat(Y_true_global, dim=0).numpy()
+    Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
 
     # Gerar predições e targets globais
-    Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
+    #Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
+    Y_true_global = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
 
-    #print(f'Labels verdadeiras: {Y_true_global[0]}')
-    #print(f'Labels preditas: {Y_pred_global[0]}')
-    print(f'Shape Y_true global: {Y_true_global.shape}')
-    print(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
+    print(f'Labels preditas: {Y_true_global[0]}')
+    print(f'Labels verdadeiras: {Y_true_global_original[0]}')
+    print(f'Labels locais: {local_inputs[2][0]}')
+    #print(f'Shape Y_true global: {Y_true_global.shape}')
+    #(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
     # Score global
-    global_score = average_precision_score(Y_true_global[:, to_eval], Y_pred_global[:, to_eval], average='micro')
+    #global_score = average_precision_score(Y_true_global[:, to_eval], Y_pred_global[:, to_eval], average='micro')
 
-    local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
-    global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
+    #local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
+    #global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
 
-    #print(f'Local test score: {local_val_score}')
-    print(f'Global test score: {global_score}')
+
+   # print(f'Global test score: {global_score}')
     #print(f'Global test loss: {global_val_loss}')
     # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
     #local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
     #global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
-    #print(f'Local test score: {local_val_score}')
+
     #print(f'Global test loss:{global_val_loss}')
 
     return None
