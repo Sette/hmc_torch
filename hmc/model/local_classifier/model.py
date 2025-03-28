@@ -48,19 +48,12 @@ class BuildClassification(nn.Module):
         super(BuildClassification, self).__init__()
         self.classifier = nn.Sequential(
             nn.Linear(input_shape, hidden_size),
-            nn.Linear(hidden_size, output_size)
+            nn.Linear(hidden_size, output_size),
+            nn.Sigmoid()
         )
-        self._initialize_weights()
-
     def forward(self, x):
         return self.classifier(x)
     
-    def _initialize_weights(self):
-        for m in self.classifier:
-            if isinstance(m, nn.Linear):
-                init.kaiming_uniform_(m.weight, a=0.01)
-                if m.bias is not None:
-                    init.constant_(m.bias, 0)
 
 
 class HMCLocalClassificationModel(nn.Module):
@@ -70,25 +63,31 @@ class HMCLocalClassificationModel(nn.Module):
         self.levels_size = levels_size
         print(levels_size)
         self.levels = nn.ModuleList()
-        self.output_normalization = nn.ModuleList()
-        next_size = 0
         for level_size in levels_size.values():
-            self.levels.append(BuildClassification(input_size + next_size, hidden_size, level_size))
-            self.output_normalization.append(OutputNormalization())
-            next_size = level_size
-        
-        
+            self.levels.append(BuildClassification(input_size, hidden_size, level_size))
+            
+            
+            
+            
     def forward(self, x):
         outputs = []
-        current_input = x
-        current_output = current_input
         for i, level in enumerate(self.levels):
-            if i != 0:
-                current_input = torch.cat((current_output.detach(), x), dim=1)
-            local_output = level(current_input)
+            local_output = level(x)
             outputs.append(local_output)
-            current_output = self.output_normalization[i](local_output)
         return outputs
+        
+        
+    # def forward(self, x):
+    #     outputs = []
+    #     current_input = x
+    #     current_output = current_input
+    #     for i, level in enumerate(self.levels):
+    #         if i != 0:
+    #             current_input = torch.cat((current_output.detach(), x), dim=1)
+    #         local_output = level(current_input)
+    #         outputs.append(local_output)
+    #         current_output = self.output_normalization[i](local_output)
+    #     return outputs
     '''
     def predict(self, base_path, batch_size=64):
         torch_path = os.path.join(base_path, 'torch')

@@ -74,7 +74,7 @@ if [ "$DATASET" = "all" ]; then
         # Loop para executar com diferentes seeds
         for SEED in 0
         do
-            echo "Running: python main.py --dataset $dataset --seed $seed --device 3"
+            echo "Running: python main.py --dataset $dataset --seed $SEED "
             # Controle de processos simultâneos
             python -m hmc.train.main \
                 --datasets "$dataset" \
@@ -105,7 +105,7 @@ if [ "$DATASET" = "all" ]; then
 else
     for SEED in 0
         do
-            echo "Running: python main.py --dataset $DATASET --seed $seed --device 3"
+            echo "Running: python main.py --dataset $DATASET --seed $SEED"
             # Controle de processos simultâneos
             python -m hmc.train.main \
                 --datasets "$DATASET" \

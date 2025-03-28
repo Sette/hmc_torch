@@ -4,7 +4,6 @@ from hmc.model.losses import show_global_loss, show_local_losses
 from hmc.dataset.manager import initialize_dataset_experiments
 
 from sklearn.metrics import average_precision_score
-from hmc.model.global_classifier import ConstrainedFFNNModel, get_constr_out
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
 import torch
@@ -104,7 +103,7 @@ def train_local(dataset_name, args):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
 
-    criterions = [nn.BCEWithLogitsLoss(reduction='sum') for _ in hmc_dataset.levels_size]
+    criterions = [nn.BCELoss() for _ in hmc_dataset.levels_size]
 
     if torch.cuda.is_available():
         model = model.to(device)
@@ -136,26 +135,35 @@ def train_local(dataset_name, args):
             total_loss = 0.0
             for index in active_levels:
                 output = outputs[index]
-                target = targets[index]
-                loss = criterions[index](output, target)
-                total_loss += loss
-                local_train_losses[index] += loss.item()
+                target = targets[index].float()
+                # Máscara para exemplos com pelo menos uma label positiva ou negativa
+                mask = target.sum(dim=1) != 0  # shape: [batch_size]
+                if mask.sum() == 0:
+                    continue  # Nenhum exemplo válido nesse nível
+                
+                # Aplicar máscara a output e target
+                filtered_output = output[mask]
+                filtered_target = target[mask]
+                
+                loss = criterions[index](filtered_output, filtered_target)
+                local_train_losses[index] += loss
 
+        
         # Backward pass (cálculo dos gradientes)
-        total_loss.backward()
+        [total_loss.backward() for total_loss in local_train_losses if total_loss > 0]
         optimizer.step()
 
         local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
         global_train_loss = sum(local_train_losses) / hmc_dataset.max_depth
-        current_train_loss = round(global_train_loss, 3)
+        
 
         print(f'\nEpoch {epoch}/{args.num_epochs}')
 
         for i in active_levels:
-            if round(local_train_losses[i], 3) < round(best_train_losses[i], 3):
-                best_train_losses[i] = round(local_train_losses[i], 3)
+            if round(local_train_losses[i].item(), 3) < round(best_train_losses[i], 3):
+                best_train_losses[i] = round(local_train_losses[i].item(), 3)
                 patience_counters[i] = 0
-                print(f"Level {i}: improved (loss={local_train_losses[i]:.4f})")
+                print(f"Level {i}: improved (loss={local_train_losses[i].item():.4f})")
             else:
                 patience_counters[i] += 1
                 print(f"Level {i}: no improvement (patience {patience_counters[i]}/{early_stopping_patience})")
@@ -175,11 +183,11 @@ def train_local(dataset_name, args):
     local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
     local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
     Y_true_global = []
-    with ((torch.no_grad())):
+    with (torch.no_grad()):
         for inputs, targets, global_targets  in test_loader:
             if torch.cuda.is_available():
                 inputs = inputs.to('cuda')
-                targets = [target.to('cuda') for target in targets]
+                targets = [target.to('cuda').float() for target in targets]
                 global_targets = global_targets.to('cpu')
             outputs = model(inputs.float())
 
@@ -198,7 +206,7 @@ def train_local(dataset_name, args):
     local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
-    # Calcular score local
+    # Get local scores
     local_val_score = [
         average_precision_score(target, output, average='micro')
         for target, output in zip(local_inputs, local_outputs)
@@ -207,13 +215,13 @@ def train_local(dataset_name, args):
     # Concat global targets
     Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
 
-    # Gerar predições e targets globais
+    
     #Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
-    Y_true_global = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
+    #Y_true_global_convertida = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
 
-    print(f'Labels preditas: {Y_true_global[0]}')
-    print(f'Labels verdadeiras: {Y_true_global_original[0]}')
-    print(f'Labels locais: {local_inputs[2][0]}')
+    #print(f'Labels convertidas: {Y_true_global_convertida[0]}')
+    #print(f'Labels verdadeiras: {Y_true_global_original[1]}')
+    #print(f'Labels locais: {local_inputs[1][0]}')
     #print(f'Shape Y_true global: {Y_true_global.shape}')
     #(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
     # Score global
@@ -223,7 +231,7 @@ def train_local(dataset_name, args):
     #global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
 
 
-   # print(f'Global test score: {global_score}')
+    #print(f'Global test score: {global_score}')
     #print(f'Global test loss: {global_val_loss}')
     # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
     #local_val_losses = [loss / len(test_loader) for loss in local_val_losses]

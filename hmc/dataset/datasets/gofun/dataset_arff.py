@@ -95,18 +95,18 @@ def parse_arff(arff_file, is_go=False):
                     y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1
                     y_[nodes_idx[t.replace('/', '.')]] = 1
 
-                    ### Local labels
-                    #depth =  get_depth_by_root(g_t, t, to_skip)
-                    depth = nx.shortest_path_length(g, t.replace('/', '.'), "root")
+                    depth = t.count('/') + 1
+                    
+                    
                     assert depth != None
-
-                    y_local_[depth-1][local_nodes_idx[depth-1].get(t.replace('/', '.'))] = 1
-                    for ancestor in nx.ancestors(g_t, t.replace('/', '.')):
-                        if ancestor not in  to_skip:
-                            depth = nx.shortest_path_length(g, ancestor , "root")
-                            y_local_[depth - 1][local_nodes_idx[depth - 1].get(t.replace('/', '.'))] = 1
-                            y_local_[depth-1][local_nodes_idx[depth-1].get(ancestor)] = 1
-
+                    
+                    for index in range(depth, 0, -1):
+                        local_terms = t.split('/')[:index]
+                        local_label = '/'.join(local_terms)
+                        local_depth = local_label.count('/')
+                        
+                        y_local_[local_depth][local_nodes_idx.get(local_depth).get(local_label)] = 1
+                    
                 Y.append(y_)
                 Y_local.append([np.stack(y) for y in y_local_])
         X = np.array(X)
