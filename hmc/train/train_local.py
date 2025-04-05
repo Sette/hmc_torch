@@ -18,11 +18,29 @@ def local_to_global_predictions(local_preds, local_nodes_idx, nodes_idx):
     n_samples = local_preds[0].shape[0]
     n_global_labels = len(nodes_idx)
     global_preds = np.zeros((n_samples, n_global_labels))
+    local_nodes_reverse = [{v: k for k, v in local_nodes.items()} for local_nodes in local_nodes_idx.values()]
 
-    for level, label_to_local_idx in local_nodes_idx.items():
-        for node_name, local_idx in label_to_local_idx.items():
-            global_idx = nodes_idx[node_name.replace('/', '.')]
-            global_preds[:, global_idx] = local_preds[level][:, local_idx]
+    print(f'Exemplos: {n_samples}')
+    print(f'Shape local_preds: {len(local_preds)}')
+    print(f'Local nodes idx: {local_nodes_reverse}')
+
+    for index, local_labels in enumerate(local_preds):
+        for idx_example, local_label in enumerate(local_labels):
+            print(np.where(local_label == 1)[0])
+            local_indices = [i for i, x in enumerate(local_labels[index]) if x == 1]
+            print(type(local_indices))
+            for local_indice in local_indices:
+                node_name = local_nodes_reverse[index].get(local_indice)
+                global_idx = nodes_idx[node_name.replace('/', '.')]
+                global_preds[idx_example][:, global_idx] = 1
+
+
+
+
+    # for level, label_to_local_idx in local_nodes_idx.items():
+    #     for node_name, local_idx in label_to_local_idx.items():
+    #         global_idx = nodes_idx[node_name.replace('/', '.')]
+    #         global_preds[:, global_idx] = local_preds[level][:, local_idx]
 
     return global_preds
 
@@ -190,11 +208,10 @@ def train_local(dataset_name, args):
                 loss = criterions[index](output, target)
                 total_val_loss += loss
                 local_val_losses[index] += loss.item()
-                predicted = output.data > 0.5
-                predicted = predicted.to('cpu')
+                output = output.to('cpu')
                 target = target.to('cpu')
                 local_inputs[index].append(target)
-                local_outputs[index].append(predicted)
+                local_outputs[index].append(output)
             Y_true_global.append(global_targets)
         # Concat all outputs and targets by level
     local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
@@ -211,10 +228,10 @@ def train_local(dataset_name, args):
 
     
     #Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
-    #Y_true_global_convertida = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
+    Y_true_global_convertida = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
 
-    #print(f'Labels convertidas: {Y_true_global_convertida[0]}')
-    #print(f'Labels verdadeiras: {Y_true_global_original[1]}')
+    print(f'Labels convertidas: {Y_true_global_convertida[0]}')
+    print(f'Labels verdadeiras: {Y_true_global_original[0]}')
     #print(f'Labels locais: {local_inputs[1][0]}')
     #print(f'Shape Y_true global: {Y_true_global.shape}')
     #(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
