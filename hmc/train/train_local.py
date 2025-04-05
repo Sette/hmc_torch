@@ -228,10 +228,10 @@ def train_local(dataset_name, args):
 
     
     #Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
-    Y_true_global_convertida = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
+    #Y_true_global_convertida = local_to_global_predictions(local_inputs, train.local_nodes_idx, train.nodes_idx)
 
-    print(f'Labels convertidas: {Y_true_global_convertida[0]}')
-    print(f'Labels verdadeiras: {Y_true_global_original[0]}')
+    #print(f'Labels convertidas: {Y_true_global_convertida[0]}')
+    #print(f'Labels verdadeiras: {Y_true_global_original[0]}')
     #print(f'Labels locais: {local_inputs[1][0]}')
     #print(f'Shape Y_true global: {Y_true_global.shape}')
     #(f'Shape Y_pred global convertido: {Y_pred_global.shape}')
