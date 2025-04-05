@@ -10,7 +10,7 @@ def show_local_losses(local_losses, set='Train'):
     print(formated_string)
 
 def show_global_loss(global_loss, set='Train'):
-    print(f'Global average loss {set} Loss: {global_loss:.4f}')
+    print(f'Global average {set} Loss: {global_loss:.4f}')
 
 class MaskedBCELoss(nn.Module):
     def __init__(self):

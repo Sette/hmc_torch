@@ -82,13 +82,7 @@ def train_local(dataset_name, args):
                              batch_size=args.batch_size,
                              shuffle=False)
 
-    num_epochs = args.num_epochs
-    if 'GO' in dataset_name:
-        num_to_skip = 4
-    else:
-        num_to_skip = 1
-
-
+   
     params = {
         'levels_size': hmc_dataset.levels_size,
         'input_size': args.input_dims[data]
@@ -109,7 +103,7 @@ def train_local(dataset_name, args):
         model = model.to(device)
         criterions = [criterion.to('cuda') for criterion in criterions]
 
-    early_stopping_patience = 3
+    early_stopping_patience = 5
     best_train_losses = [float('inf')] * hmc_dataset.max_depth
     patience_counters = [0] * hmc_dataset.max_depth
     level_active = [True] * hmc_dataset.max_depth
@@ -213,7 +207,7 @@ def train_local(dataset_name, args):
     ]
     print(f'Local test score: {local_val_score}')
     # Concat global targets
-    Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
+    #Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
 
     
     #Y_pred_global = local_to_global_predictions(local_outputs, train.local_nodes_idx, train.nodes_idx)
