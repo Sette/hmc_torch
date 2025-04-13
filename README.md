@@ -9,7 +9,7 @@ This document summarizes the HMC Torch project, a hierarchical multi-label class
 - **Main Changes**:
   - Removed the main function from the training file to simplify the code structure.
   - Updated `.gitignore` to improve version control management.
-  
+
 ## Project Structure
 The project contains the following key files and directories:
 - **Notebooks**:

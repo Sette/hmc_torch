@@ -1,4 +1,3 @@
-
 import torch
 import numpy as np
 import networkx as nx
@@ -8,12 +7,11 @@ from hmc.dataset.datasets.gofun import get_dataset_paths
 
 from hmc.dataset.datasets.gofun import to_skip
 from collections import defaultdict
-from hmc.dataset import  HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
+from hmc.dataset import HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
 
 # Configurar o logger
 logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 # Criar um logger
@@ -31,14 +29,26 @@ class HMCDatasetManager:
     - device (str, optional): Computation device ('cpu' or 'cuda'). Default is 'cpu'.
     - is_local (bool, optional): Whether to use local_classifier hierarchy. Default is False.
     - is_global (bool, optional): Whether to use global hierarchy. Default is False.
-    - input_scaler (bool, optional): Whether to apply input scaling (imputation + standardization). Default is True.
+    - input_scaler (bool, optional): Whether to apply input scaling
+    (imputation + standardization). Default is True.
 
     """
 
-    def __init__(self, dataset, dataset_type='csv', device='cpu', is_global=False):
+    def __init__(self, dataset, dataset_type="csv", device="cpu", is_global=False):
         # Extract dataset paths
-        self.test, self.train, self.valid, self.to_eval, self.max_depth = None, None, None, None, None
-        self.levels, self.levels_size,  self.nodes_idx, self.local_nodes_idx = {}, {}, {}, {}
+        self.test, self.train, self.valid, self.to_eval, self.max_depth = (
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        self.levels, self.levels_size, self.nodes_idx, self.local_nodes_idx = (
+            {},
+            {},
+            {},
+            {},
+        )
         self.labels, self.roots, self.nodes, self.g_t, self.A = [], [], [], [], []
         self.to_skip = to_skip
         # Initialize attributes
@@ -50,58 +60,60 @@ class HMCDatasetManager:
         # train_csv_name = Path(self.train_file).name
         # self.graph_path = os.path.join(output_path, train_csv_name.replace('-.csv', '.graphml'))
 
-        if dataset_type == 'arff':
+        if dataset_type == "arff":
             self.is_go, self.train_file, self.valid_file, self.test_file = dataset
         else:
             self.train_file, self.valid_file, self.test_file, self.labels_file = dataset
             # Infer dataset type
-            self.is_go = any(keyword in self.train_file for keyword in ['GO', 'go'])
-            self.is_fma = any(keyword in self.train_file for keyword in ['fma', 'FMA'])
+            self.is_go = any(keyword in self.train_file for keyword in ["GO", "go"])
+            self.is_fma = any(keyword in self.train_file for keyword in ["fma", "FMA"])
             # Load hierarchical structure
             self.load_structure_from_json(self.labels_file)
 
         logger.info(f"Loading dataset from {self.train_file}")
 
-        if dataset_type == 'csv':
+        if dataset_type == "csv":
             self.load_csv_data()
             self.to_eval = [t not in self.to_skip for t in self.nodes]
-        elif dataset_type == 'torch':
+        elif dataset_type == "torch":
             self.load_torch_data()
             self.to_eval = [t not in self.to_skip for t in self.nodes]
-        elif dataset_type == 'arff':
+        elif dataset_type == "arff":
             self.load_arff_data()
 
-
-
-
         # Ensure category labels exist before evaluation filtering
-        #self.to_eval = [t not in self.to_skip for t in self.nodes]
-
+        # self.to_eval = [t not in self.to_skip for t in self.nodes]
 
     def load_structure_from_json(self, labels_json):
         # Load labels JSON
         self.labels = __load_json__(labels_json)
-        for cat in self.labels['labels']:
-            terms = cat.split('/')
+        for cat in self.labels["labels"]:
+            terms = cat.split("/")
             if self.is_go:
                 self.g.add_edge(terms[1], terms[0])
             else:
                 if len(terms) == 1:
-                    self.g.add_edge(terms[0], 'root')
+                    self.g.add_edge(terms[0], "root")
                 else:
                     for i in range(2, len(terms) + 1):
-                        self.g.add_edge('.'.join(terms[:i]), '.'.join(terms[:i - 1]))
+                        self.g.add_edge(".".join(terms[:i]), ".".join(terms[: i - 1]))
 
-        self.nodes = sorted(self.g.nodes(), key=lambda x: (nx.shortest_path_length(self.g, x, 'root'), x) if self.is_go else (len(x.split('.')), x))
+        self.nodes = sorted(
+            self.g.nodes(),
+            key=lambda x: (
+                (nx.shortest_path_length(self.g, x, "root"), x)
+                if self.is_go
+                else (len(x.split(".")), x)
+            ),
+        )
         self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
         self.g_t = self.g.reverse()
 
-        ### Save networkx graph
+        # Save networkx graph
         # Para salvar em formato GraphML
-        #nx.write_graphml(self.g, self.graph_path)
+        # nx.write_graphml(self.g, self.graph_path)
 
         self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
-
 
     def get_hierarchy_levels(self):
         """
@@ -109,7 +121,7 @@ class HMCDatasetManager:
         """
         self.levels_size = defaultdict(int)
         self.levels = defaultdict(list)
-        #level_by_node = nx.shortest_path_length(self.g_t, "root")
+        # level_by_node = nx.shortest_path_length(self.g_t, "root")
         #
         # for node in self.g.nodes():
         #     depth = level_by_node.get(node)
@@ -117,14 +129,16 @@ class HMCDatasetManager:
         #         self.levels[depth] = []
         #     self.levels[depth].append(node)
         for label in self.nodes:
-            level = label.count('.')  # Count the number of '.' to determine the level
+            level = label.count(".")  # Count the number of '.' to determine the level
             self.levels[level].append(label)
             self.levels_size[level] += 1
 
         self.max_depth = len(self.levels_size)
         print(self.levels_size)
-        self.local_nodes_idx = {idx: dict(zip(level_nodes, range(len(level_nodes)))) for idx, level_nodes in
-                                self.levels.items()}
+        self.local_nodes_idx = {
+            idx: dict(zip(level_nodes, range(len(level_nodes))))
+            for idx, level_nodes in self.levels.items()
+        }
 
     def compute_matrix_R(self):
         # Compute matrix of ancestors R, named matrix_r
@@ -153,9 +167,11 @@ class HMCDatasetManager:
             else:
                 sorted_keys = sorted(self.levels_size.keys())
                 y_local_ = [np.zeros(self.levels_size.get(key)) for key in sorted_keys]
-            for node in labels.split('@'):
+            for node in labels.split("@"):
                 if self.is_global:
-                    y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node)]] = 1
+                    y_[
+                        [self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node)]
+                    ] = 1
                     y_[self.nodes_idx[node]] = 1
 
                 if not self.is_global:
@@ -163,8 +179,12 @@ class HMCDatasetManager:
                     y_local_[depth][self.local_nodes_idx[depth].get(node)] = 1
                     for ancestor in nx.ancestors(self.g_t, node):
                         if ancestor != "root":
-                            depth = nx.shortest_path_length(self.g_t, "root").get(ancestor)
-                            y_local_[depth][self.local_nodes_idx[depth].get(ancestor)] = 1
+                            depth = nx.shortest_path_length(self.g_t, "root").get(
+                                ancestor
+                            )
+                            y_local_[depth][
+                                self.local_nodes_idx[depth].get(ancestor)
+                            ] = 1
 
             if self.is_global:
                 Y.append(y_)
@@ -184,15 +204,15 @@ class HMCDatasetManager:
         self.test = HMCDatasetCsv(self.test_file, is_go=self.is_go)
 
         dataset_labels = self.train.df.labels.values
-        logger.info(f"Transforming train labels")
+        logger.info("Transforming train labels")
         self.train.set_y(self.transform_labels(dataset_labels))
 
         dataset_labels = self.valid.df.labels.values
-        logger.info(f"Transforming valid labels")
+        logger.info("Transforming valid labels")
         self.valid.set_y(self.transform_labels(dataset_labels))
 
         dataset_labels = self.test.df.labels.values
-        logger.info(f"Transforming test labels")
+        logger.info("Transforming test labels")
         self.test.set_y(self.transform_labels(dataset_labels))
 
     def load_torch_data(self):
@@ -201,15 +221,15 @@ class HMCDatasetManager:
         self.test = HMCDatasetTorch(self.test_file)
 
         dataset_labels = self.train.Y
-        logger.info(f"Transforming train labels")
+        logger.info("Transforming train labels")
         self.train.set_y(self.transform_labels(dataset_labels))
 
         dataset_labels = self.valid.Y
-        logger.info(f"Transforming valid labels")
+        logger.info("Transforming valid labels")
         self.valid.set_y(self.transform_labels(dataset_labels))
 
         dataset_labels = self.test.Y
-        logger.info(f"Transforming test labels")
+        logger.info("Transforming test labels")
         self.test.set_y(self.transform_labels(dataset_labels))
 
     def load_arff_data(self):
@@ -231,7 +251,7 @@ class HMCDatasetManager:
 def initialize_dataset_experiments(
     name: str,
     device: str = "cpu",
-    dataset_type='torch',
+    dataset_type="torch",
     is_global: bool = False,
 ) -> HMCDatasetManager:
     """
@@ -250,10 +270,12 @@ def initialize_dataset_experiments(
     # Load dataset paths
     datasets = get_dataset_paths(dataset_type=dataset_type)
 
-
     # Validate if the dataset exists
     if name not in datasets:
-        raise ValueError(f"Dataset '{name}' not found in experiments datasets. Available datasets: {list(datasets.keys())}")
+        raise ValueError(
+            f"Dataset '{name}' not found in experiments datasets. \
+            Available datasets: {list(datasets.keys())}"
+        )
 
     # Initialize dataset manager
     return HMCDatasetManager(
@@ -262,5 +284,3 @@ def initialize_dataset_experiments(
         device=device,
         is_global=is_global,
     )
-
-

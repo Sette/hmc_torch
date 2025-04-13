@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
-from hmc.model.metrics import custom_thresholds, custom_dropouts, custom_lrs, custom_optimizers
 
 
 def transform_predictions(predictions):
@@ -13,7 +11,7 @@ def transform_predictions(predictions):
         for level in predictions:  # Iterate over the levels
             example.append(level[i])  # Get the first element from each level at index i
         transformed.append(example)
-    
+
     return transformed
 
 
@@ -27,6 +25,7 @@ class ExpandOutputClassification(nn.Module):
         x = self.dense(x)
         x = self.relu(x)
         return x
+
 
 class OutputNormalization(nn.Module):
     def __init__(self):
@@ -49,11 +48,11 @@ class BuildClassification(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(input_shape, hidden_size),
             nn.Linear(hidden_size, output_size),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
+
     def forward(self, x):
         return self.classifier(x)
-    
 
 
 class HMCLocalClassificationModel(nn.Module):
@@ -61,22 +60,17 @@ class HMCLocalClassificationModel(nn.Module):
         super(HMCLocalClassificationModel, self).__init__()
         self.input_size = input_size
         self.levels_size = levels_size
-        print(levels_size)
         self.levels = nn.ModuleList()
         for level_size in levels_size.values():
             self.levels.append(BuildClassification(input_size, hidden_size, level_size))
-            
-            
-            
-            
+
     def forward(self, x):
         outputs = []
         for i, level in enumerate(self.levels):
             local_output = level(x)
             outputs.append(local_output)
         return outputs
-        
-        
+
     # def forward(self, x):
     #     outputs = []
     #     current_input = x
@@ -88,12 +82,12 @@ class HMCLocalClassificationModel(nn.Module):
     #         outputs.append(local_output)
     #         current_output = self.output_normalization[i](local_output)
     #     return outputs
-    '''
+    """
     def predict(self, base_path, batch_size=64):
         torch_path = os.path.join(base_path, 'torch')
         test_torch_path = os.path.join(torch_path, 'test')
         #test_csv_path = os.path.join(base_path, 'test.csv')
-        self.eval()  
+        self.eval()
         ds_test = HMCDataset(test_torch_path, self.levels_size, testset=True)
         #df_test = pd.read_csv(test_csv_path)
         test_loader = DataLoader(ds_test, batch_size=batch_size, shuffle=False)
@@ -116,16 +110,17 @@ class HMCLocalClassificationModel(nn.Module):
                     levels_pred[level_name] = pred
                 return track_id, levels_pred
                 # Itera sobre as saídas de cada nível e aplica o threshold correspondente
-                #for level_output, _ in zip(outputs_per_level, self.thresholds):
+                # for level_output, _ in zip(outputs_per_level, self.thresholds):
                     # Aplica o threshold para converter em saída binária (0 ou 1)
-                    #binary_output = (level_output >= threshold).float()  #  threshold
-                    #batch_predictions.append(binary_output.cpu().detach().numpy())  # Converte para NumPy e armazena
-                #    batch_predictions.append(level_output.cpu().detach().numpy())
-                    # Armazena as previsões do batch atual para todos os níveis
+                    # Sbinary_output = (level_output >= threshold).float()  #  threshold
+                    # Converte para NumPy e armazena
+                    # batch_predictions.append(binary_output.cpu().detach().numpy())
+                    # batch_predictions.append(level_output.cpu().detach().numpy())
+                    # SArmazena as previsões do batch atual para todos os níveis
             #predictions.append(batch_predictions)
             #output_list = [level_targets for level_targets in zip(*predictions)]
             #output_list = transform_predictions(output_list)
 
         #df_test['predictions'] = output_list
         return predictions
-    '''
+    """

@@ -1,7 +1,7 @@
-
 import os
 import json
 import datetime
+
 
 def create_dir(path):
     # checking if the directory demo_folder2
@@ -12,11 +12,13 @@ def create_dir(path):
         os.makedirs(path)
     return True
 
+
 def __load_json__(path):
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         tmp = json.loads(f.read())
 
     return tmp
+
 
 def join_path(path, file):
     if path.endswith("/") and file.startswith("/"):

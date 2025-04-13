@@ -1,19 +1,13 @@
 import os
 import pandas as pd
-import numpy as np
-import networkx as nx
 import ast
 import logging
-import torch
-import keras
-from itertools import chain
 
 os.environ["DATA_FOLDER"] = "./"
 
 # Configurar o logger
 logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 # Criar um logger
@@ -22,7 +16,7 @@ logger = logging.getLogger(__name__)
 BUFFER_SIZE = 10
 
 # Skip the root nodes
-to_skip = ['root', 'GO0003674', 'GO0005575', 'GO0008150']
+to_skip = ["root", "GO0003674", "GO0005575", "GO0008150"]
 
 
 class HMCDatasetCsv:
@@ -42,4 +36,3 @@ class HMCDatasetCsv:
 
     def set_y(self, y):
         self.Y = y
-

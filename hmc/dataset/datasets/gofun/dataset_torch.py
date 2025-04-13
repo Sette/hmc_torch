@@ -12,7 +12,7 @@ class HMCDatasetTorch:
         self.Y = []
         self.examples = []
 
-        pt_files = [f for f in os.listdir(path) if f.endswith('.pt')]
+        pt_files = [f for f in os.listdir(path) if f.endswith(".pt")]
 
         for file in pt_files:
             data = torch.load(os.path.join(path, file), weights_only=False)
@@ -24,6 +24,7 @@ class HMCDatasetTorch:
                 raise ValueError(f"Arquivo {file} possui tipo inesperado: {type(data)}")
 
         self.parse_to_array()
+
     def __len__(self):
         return len(self.examples)
 
@@ -32,8 +33,8 @@ class HMCDatasetTorch:
         Retorna uma amostra dos dados.
         """
         item = self.examples[idx]
-        features = item['features']  # tensor
-        labels = item['labels']      # lista de strings
+        features = item["features"]  # tensor
+        labels = item["labels"]  # lista de strings
         return features, labels
 
     def parse_to_array(self):

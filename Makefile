@@ -6,16 +6,15 @@ install-dependencies:
 
 lint-check:
 	@echo "--> Running linter check"
-	black --check .
 	flake8 **/*.py
-	pylama app
+	black --check .
+	pylama hmc
 	isort -c .
 
 lint:
 	@echo "--> Running linter"
 	black .
 	flake8 .
-	pylama app
 	isort .
 
 dvc:

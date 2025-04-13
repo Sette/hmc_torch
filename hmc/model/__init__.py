@@ -1,2 +1,0 @@
-from hmc.model.local_classifier import HMCLocalClassificationModel
-from hmc.model.global_classifier import ConstrainedFFNNModel

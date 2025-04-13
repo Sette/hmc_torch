@@ -8,39 +8,41 @@ from sklearn.metrics import average_precision_score
 
 def get_constr_out(x, R):
     """
-    Given the network output x and a constraint matrix R, 
+    Given the network output x and a constraint matrix R,
     returns the modified output according to the hierarchical constraints in R.
     """
     # Convert x to double precision
     c_out = x.double()
-    
+
     # Add a dimension to c_out: from (N, D) to (N, 1, D)
     # N: batch size, D: dimensionality of the output
     c_out = c_out.unsqueeze(1)
-    
+
     # Expand c_out to match the shape of R:
     # If R is (C, C), c_out becomes (N, C, C)
     c_out = c_out.expand(len(x), R.shape[1], R.shape[1])
-    
+
     # Expand R similarly to (N, C, C)
     R_batch = R.expand(len(x), R.shape[1], R.shape[1])
-    
-    # Element-wise multiplication of R_batch by c_out. 
+
+    # Element-wise multiplication of R_batch by c_out.
     # This produces a (N, C, C) tensor.
     # torch.max(...) is taken along dimension=2, resulting in (N, C).
-    # This extracts the maximum along the last dimension, effectively applying the hierarchical constraints.
+    # This extracts the maximum along the last dimension,
+    # effectively applying the hierarchical constraints.
     final_out, _ = torch.max(R_batch * c_out.double(), dim=2)
-    
+
     return final_out
 
 
 class ConstrainedFFNNModel(nn.Module):
-    """ C-HMCNN(h) model - during training it returns the not-constrained output that is then passed to MCLoss """
+    """C-HMCNN(h) model - during training it returns the not-constrained
+    output that is then passed to MCLoss"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, hyperparams, R):
         super(ConstrainedFFNNModel, self).__init__()
 
-        self.nb_layers = hyperparams['num_layers']
+        self.nb_layers = hyperparams["num_layers"]
         self.R = R
 
         fc = []
@@ -53,10 +55,10 @@ class ConstrainedFFNNModel(nn.Module):
                 fc.append(nn.Linear(hidden_dim, hidden_dim))
         self.fc = nn.ModuleList(fc)
 
-        self.drop = nn.Dropout(hyperparams['dropout'])
+        self.drop = nn.Dropout(hyperparams["dropout"])
 
         self.sigmoid = nn.Sigmoid()
-        if hyperparams['non_lin'] == 'tanh':
+        if hyperparams["non_lin"] == "tanh":
             self.f = nn.Tanh()
         else:
             self.f = nn.ReLU()
@@ -76,9 +78,21 @@ class ConstrainedFFNNModel(nn.Module):
 
 
 class ConstrainedFFNNModelPL(LightningModule):
-    def __init__(self, input_dim, hidden_dim, output_dim, hyperparams, R, to_eval, lr, weight_decay):
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim,
+        output_dim,
+        hyperparams,
+        R,
+        to_eval,
+        lr,
+        weight_decay,
+    ):
         super().__init__()
-        self.model = ConstrainedFFNNModel(input_dim, hidden_dim, output_dim, hyperparams, R)
+        self.model = ConstrainedFFNNModel(
+            input_dim, hidden_dim, output_dim, hyperparams, R
+        )
         self.model = self.model.to(self.device)
         self.R = R
         self.to_eval = to_eval.to(self.device)
@@ -124,11 +138,9 @@ class ConstrainedFFNNModelPL(LightningModule):
 
         constrained_output = self.model(x.float())
 
-        self.val_outputs.append({
-            "constr_output": constrained_output.cpu(),
-            "y": y.cpu()
-        })
-
+        self.val_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -136,10 +148,9 @@ class ConstrainedFFNNModelPL(LightningModule):
 
         constrained_output = self.model(x.float())
 
-        self.test_outputs.append({
-            "constr_output": constrained_output.cpu(),
-            "y": y.cpu()
-        })
+        self.test_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
     def on_test_epoch_end(self):
         """Processa os resultados e salva em `lightning_logs`."""
@@ -149,30 +160,40 @@ class ConstrainedFFNNModelPL(LightningModule):
         constr_test = torch.cat([x["constr_output"] for x in self.test_outputs], dim=0)
         y_test = torch.cat([x["y"] for x in self.test_outputs], dim=0)
 
-        score = average_precision_score(y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro")
+        score = average_precision_score(
+            y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro"
+        )
         self.log("test_score", score, prog_bar=True, logger=True)
 
         # 📁 Obtém o diretório do Lightning Logs
-        log_dir = self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        log_dir = (
+            self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        )
         results_path = os.path.join(log_dir, "results.csv")
 
         # 🔥 Cria o diretório se não existir
         os.makedirs(log_dir, exist_ok=True)
 
         # Salva os resultados em `lightning_logs/results.csv`
-        with open(results_path, 'a') as f:
+        with open(results_path, "a") as f:
             f.write(f"{self.current_epoch},{score}\n")
 
     def on_validation_epoch_end(self):
         if not self.val_outputs:
-            return # Evita erro se não houver dados
+            return  # Evita erro se não houver dados
 
         constr_val = torch.cat([x["constr_output"] for x in self.val_outputs], dim=0)
         y_val = torch.cat([x["y"] for x in self.val_outputs], dim=0)
 
-        score = average_precision_score(y_val[:, self.to_eval].cpu(), constr_val.data[:, self.to_eval].cpu(), average="micro")
+        score = average_precision_score(
+            y_val[:, self.to_eval].cpu(),
+            constr_val.data[:, self.to_eval].cpu(),
+            average="micro",
+        )
         self.log("val_score", score, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
-        optimizer  = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
         return optimizer

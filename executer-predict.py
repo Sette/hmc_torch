@@ -4,31 +4,30 @@ import json
 import torch
 from datetime import UTC
 from datetime import datetime as dt
-from hmc.utils.dir import create_dir, create_job_id
 from hmc.model import ClassificationModel
 
 base_path = "/kaggle/input/fma-large-by-effnet-discogs-rock-and-electronic/trains"
-model_path = '/kaggle/input/hmc-fma-large-rock-electronic/pytorch/default/1/20240826_232312/best_binary.pth'
+model_path = "/kaggle/input/hmc-fma-large-rock-electronic/pytorch/default/1/20240826_232312/best_binary.pth"
 sample_id = "rock_electronic"
 
 train_path = os.path.join(base_path, sample_id)
-torch_path = os.path.join(train_path, 'torch')
-metadata_path = os.path.join(train_path,"metadata.json")
-labels_path = os.path.join(train_path,"labels.json")
-testset_path = os.path.join(torch_path, 'test')
+torch_path = os.path.join(train_path, "torch")
+metadata_path = os.path.join(train_path, "metadata.json")
+labels_path = os.path.join(train_path, "labels.json")
+testset_path = os.path.join(torch_path, "test")
 
-with open(metadata_path, 'r') as f:
+with open(metadata_path, "r") as f:
     metadata = json.loads(f.read())
     print(metadata)
 
-with open(labels_path, 'r') as f:
+with open(labels_path, "r") as f:
     labels = json.loads(f.read())
 
 
 params = {
-    'levels_size': labels['levels_size'],
-    'sequence_size': metadata['sequence_size'],
-    'dropouts': [0.3, 0.7, 0.7, 0.3]
+    "levels_size": labels["levels_size"],
+    "sequence_size": metadata["sequence_size"],
+    "dropouts": [0.3, 0.7, 0.7, 0.3],
 }
 
 model = ClassificationModel(**params)
@@ -44,7 +43,7 @@ print(state_dict.keys())
 print("Chaves do modelo definido:")
 print(model.state_dict().keys())
 
-#model_load = torch.load(binary_model)
+# model_load = torch.load(binary_model)
 model.load_state_dict(state_dict)
 
 
@@ -54,11 +53,14 @@ time_start = dt.now(UTC)
 print("[{}] Predict started at {}".format(id, time_start.strftime("%H:%M:%S")))
 print(".......................................")
 
-predict = model.predict(testset_path=testset_path,batch_size=64)
+predict = model.predict(testset_path=testset_path, batch_size=64)
 
 
 time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
-print("[{}] Predict finished at {} / elapsed time {}s".format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
-
+print(
+    "[{}] Predict finished at {} / elapsed time {}s".format(
+        id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()
+    )
+)
