@@ -1,7 +1,7 @@
-from hmc.model import HMCLocalClassificationModel
+from hmc.model.local_classifier.model import HMCLocalClassificationModel
 
 from hmc.model.losses import show_global_loss, show_local_losses
-from hmc.dataset.manager import initialize_dataset_experiments
+from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 
 from sklearn.metrics import average_precision_score
 from sklearn import preprocessing
@@ -13,33 +13,57 @@ import numpy as np
 
 
 # Converter local -> global
-def local_to_global_predictions(local_preds, local_nodes_idx, nodes_idx):
-    n_samples = local_preds[0].shape[0]
+def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
+    n_samples = local_labels[0].shape[0]
     n_global_labels = len(nodes_idx)
     global_preds = np.zeros((n_samples, n_global_labels))
-    local_nodes_reverse = [
-        {v: k for k, v in local_nodes.items()}
-        for local_nodes in local_nodes_idx.values()
-    ]
+    sorted_levels = sorted(local_nodes_idx.keys())
+    local_nodes_reverse = {
+        level: {v: k for k, v in local_nodes_idx[level].items()}
+        for level in sorted_levels
+    }
+    # print(f"Local nodes idx: {local_nodes_idx}")
+    # print(f"Local nodes reverse: {local_nodes_reverse}")
 
     print(f"Exemplos: {n_samples}")
-    print(f"Shape local_preds: {len(local_preds)}")
-    print(f"Local nodes idx: {local_nodes_reverse}")
+    # print(f"Shape local_preds: {len(local_labels)}")
+    # print(f"Local nodes idx: {local_nodes_reverse}")
 
-    for index, local_labels in enumerate(local_preds):
-        for idx_example, local_label in enumerate(local_labels):
-            print(np.where(local_label == 1)[0])
-            local_indices = [i for i, x in enumerate(local_labels[index]) if x == 1]
-            print(type(local_indices))
-            for local_indice in local_indices:
-                node_name = local_nodes_reverse[index].get(local_indice)
-                global_idx = nodes_idx[node_name.replace("/", ".")]
-                global_preds[idx_example][:, global_idx] = 1
+    # Etapa 1: montar node_names ativados por exemplo
+    activated_nodes_by_example = [[] for _ in range(n_samples)]
 
-    # for level, label_to_local_idx in local_nodes_idx.items():
-    #     for node_name, local_idx in label_to_local_idx.items():
-    #         global_idx = nodes_idx[node_name.replace('/', '.')]
-    #         global_preds[:, global_idx] = local_preds[level][:, local_idx]
+    for level_index, level in enumerate(sorted_levels):
+        level_preds = local_labels[
+            level_index
+        ]  # shape: [n_samples, n_classes_at_level]
+        for idx_example, label in enumerate(level_preds):
+            local_indices = np.where(label == 1)[0]  # aceita floats ou binários
+            for local_idx in local_indices:
+                node_name = local_nodes_reverse[level].get(local_idx)
+                if node_name:
+                    activated_nodes_by_example[idx_example].append(node_name)
+                else:
+                    print(
+                        f"[WARN] Índice local {local_idx} não encontrado no nível {level}"
+                    )
+
+    # print(f"Node names ativados por exemplo: {activated_nodes_by_example[0]}")
+    global_indices = []
+    for node in activated_nodes_by_example[0]:
+        # print(f"Node names ativados: {node}")
+        if "/" in node:
+            node = node.replace("/", ".")
+        global_indices.append(nodes_idx.get(node))
+    print(global_indices)
+    # Etapa 2: converter node_names para índices globais
+    for idx_example, node_names in enumerate(activated_nodes_by_example):
+        for node_name in node_names:
+            key = node_name.replace("/", ".")
+            if key in nodes_idx:
+                global_idx = nodes_idx[key]
+                global_preds[idx_example][global_idx] = 1
+            else:
+                print(f"[WARN] Node '{key}' não encontrado em nodes_idx")
 
     return global_preds
 
@@ -55,6 +79,7 @@ def train_local(dataset_name, args):
         dataset_name, device=args.device, dataset_type="arff", is_global=False
     )
     train, valid, test = hmc_dataset.get_datasets()
+    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
     experiment = True
 
     if experiment:
@@ -119,7 +144,7 @@ def train_local(dataset_name, args):
         train_dataset.extend(val_dataset)
 
     test_dataset = [
-        (x, y_levels, y) for (x, y_levels, y) in zip(test.X, test.Y_local, train.Y)
+        (x, y_levels, y) for (x, y_levels, y) in zip(test.X, test.Y_local, test.Y)
     ]
 
     train_loader = DataLoader(
@@ -141,7 +166,9 @@ def train_local(dataset_name, args):
     #                                     input_size=args.input_dims[data],
     #                                     hidden_size=args.hidden_dim)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
 
     criterions = [nn.BCELoss() for _ in hmc_dataset.levels_size]
 
@@ -176,16 +203,8 @@ def train_local(dataset_name, args):
             for index in active_levels:
                 output = outputs[index]
                 target = targets[index].float()
-                # Máscara para exemplos com pelo menos uma label positiva ou negativa
-                mask = target.sum(dim=1) != 0  # shape: [batch_size]
-                if mask.sum() == 0:
-                    continue  # Nenhum exemplo válido nesse nível
 
-                # Aplicar máscara a output e target
-                filtered_output = output[mask]
-                filtered_target = target[mask]
-
-                loss = criterions[index](filtered_output, filtered_target)
+                loss = criterions[index](output, target)
                 local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
@@ -257,31 +276,18 @@ def train_local(dataset_name, args):
     # Concat global targets
     Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
 
-    # Y_pred_global = local_to_global_predictions(
-    # local_outputs, train.local_nodes_idx, train.nodes_idx
-    # )
-    Y_true_global_convertida = local_to_global_predictions(
-        local_inputs, train.local_nodes_idx, train.nodes_idx
+    Y_pred_global = local_to_global_predictions(
+        local_outputs, train.local_nodes_idx, train.nodes_idx
     )
 
-    print(f"Labels convertidas: {Y_true_global_convertida[0]}")
-    print(f"Labels verdadeiras: {Y_true_global_original[0]}")
-    # print(f'Labels locais: {local_inputs[1][0]}')
-    # print(f'Shape Y_true global: {Y_true_global.shape}')
-    # (f'Shape Y_pred global convertido: {Y_pred_global.shape}')
-    # Score global
-    # global_score = average_precision_score(
-    # Y_true_global[:, to_eval], Y_pred_global[:, to_eval], average='micro')
+    # Y_true_global_converted = local_to_global_predictions(
+    #     local_inputs, train.local_nodes_idx, train.nodes_idx
+    # )
 
-    # local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
-    # global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
+    score = average_precision_score(
+        Y_true_global_original[:, to_eval], Y_pred_global[:, to_eval], average="micro"
+    )
 
-    # print(f'Global test score: {global_score}')
-    # print(f'Global test loss: {global_val_loss}')
-    # score = average_precision_score(y_test[:, to_eval], outputs, average='micro')
-    # local_val_losses = [loss / len(test_loader) for loss in local_val_losses]
-    # global_val_loss = sum(local_val_losses) / hmc_dataset.max_depth
-
-    # print(f'Global test loss:{global_val_loss}')
+    print(score)
 
     return None

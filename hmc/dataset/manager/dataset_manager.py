@@ -2,12 +2,14 @@ import torch
 import numpy as np
 import networkx as nx
 import logging
-from hmc.utils import __load_json__
+from hmc.utils.dir import __load_json__
 from hmc.dataset.datasets.gofun import get_dataset_paths
 
 from hmc.dataset.datasets.gofun import to_skip
 from collections import defaultdict
-from hmc.dataset import HMCDatasetCsv, HMCDatasetTorch, HMCDatasetArff
+from hmc.dataset.datasets.gofun.dataset_csv import HMCDatasetCsv
+from hmc.dataset.datasets.gofun.dataset_arff import HMCDatasetArff
+from hmc.dataset.datasets.gofun.dataset_torch import HMCDatasetTorch
 
 # Configurar o logger
 logging.basicConfig(

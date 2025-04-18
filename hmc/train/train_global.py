@@ -1,5 +1,5 @@
 from sklearn.metrics import average_precision_score
-from hmc.model.global_classifier import ConstrainedFFNNModel, get_constr_out
+from hmc.model.global_classifier.model import ConstrainedFFNNModel, get_constr_out
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
 import torch
@@ -8,8 +8,8 @@ from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
 import networkx as nx
-from hmc.utils import create_dir
-from hmc.dataset.manager import initialize_dataset_experiments
+from hmc.utils.dir import create_dir
+from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 
 
 def train_global(dataset_name, args):
