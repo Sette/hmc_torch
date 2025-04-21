@@ -1,18 +1,19 @@
-from hmc.model.local_classifier.model import HMCLocalClassificationModel
-
-from hmc.model.losses import show_global_loss, show_local_losses
-from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
-
-from sklearn.metrics import average_precision_score
-from sklearn import preprocessing
-from sklearn.impute import SimpleImputer
-import torch
-from torch.utils.data import DataLoader
-import torch.nn as nn
 import numpy as np
+import networkx as nx
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import torch
+from sklearn.impute import SimpleImputer
+from sklearn import preprocessing
+from sklearn.metrics import average_precision_score
+from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
+from hmc.model.losses import show_global_loss, show_local_losses
+from hmc.model.local_classifier.model import HMCLocalClassificationModel
+from hmc.model.global_classifier.utils import get_constr_out
+from hmc.utils.dir import create_dir
+from sklearn.decomposition import PCA
 
 
-# Converter local -> global
 def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
     n_samples = local_labels[0].shape[0]
     n_global_labels = len(nodes_idx)
@@ -68,6 +69,45 @@ def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
     return global_preds
 
 
+def convert_levels_with_nodes_idx(levels_by_name, nodes_idx):
+    """
+    Converte os nomes das labels por nível em índices globais com base no dict nodes_idx.
+
+    Args:
+        levels_by_name (dict[int, list[str]]): labels por nível, ex: ['01', '01/01', ...]
+        nodes_idx (dict[str, int]): mapeia label → índice global
+
+    Returns:
+        dict[int, list[int]]: índices globais por nível
+    """
+    levels_indices = {}
+
+    for level, label_names in levels_by_name.items():
+        indices = [nodes_idx[name] for name in label_names if name in nodes_idx]
+        levels_indices[level] = indices
+
+    return levels_indices
+
+
+def compute_R_levels_simple(A, levels):
+    G = nx.DiGraph(A)
+    R_levels = []
+
+    for level_indices in levels.values():
+        size = len(level_indices)
+        R = np.zeros((size, size))
+
+        for i in range(size):
+            descendants = list(nx.descendants(G, i))
+            print(f"Descendants of {i}: {descendants}")
+            if descendants:
+                R[i, descendants] = 1
+
+        R_levels.append(torch.tensor(R, dtype=torch.float64).to('cuda'))
+
+    return R_levels
+
+
 def train_local(dataset_name, args):
     print(".......................................")
     print("Experiment with {} dataset ".format(dataset_name))
@@ -101,6 +141,36 @@ def train_local(dataset_name, args):
         "lr": args.lr,
         "weight_decay": args.weight_decay,
     }
+
+    # Compute matrix of ancestors R
+    # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
+    R = np.zeros(train.A.shape)
+    np.fill_diagonal(R, 1)
+    g = nx.DiGraph(train.A)
+    for i in range(len(train.A)):
+        descendants = list(nx.descendants(g, i))
+        if descendants:
+            R[i, descendants] = 1
+    print(f"R shape: {R.shape}")
+    R_levels = []
+    for level, size in hmc_dataset.levels_size.items():
+        print(f"Level size: {level}")
+    
+        pca = PCA(n_components=size)
+        pca.fit_transform(R)
+        # Cada linha de components_ é um vetor base no espaço original de 500 dimensões
+        components = pca.components_  # shape: (size, 500)
+
+        # Podemos projetar as bases umas sobre as outras para gerar matriz size×size
+        R_reduced = components @ components.T  # shape: (size, size)
+        R_levels.append(torch.tensor(R_reduced, dtype=torch.float64).to(device))
+        print(f"R_reduced shape: {R_reduced.shape} for level: {level}")
+        
+
+    R = torch.tensor(R)
+    # Transpose to get the ancestors for each node
+    R = R.transpose(1, 0)
+    R = R.unsqueeze(0)
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
     imp_mean = SimpleImputer(missing_values=np.nan, strategy="mean").fit(
@@ -202,9 +272,16 @@ def train_local(dataset_name, args):
 
             for index in active_levels:
                 output = outputs[index]
-                target = targets[index].float()
 
-                loss = criterions[index](output, target)
+                constr_output = get_constr_out(output, R_levels[index])
+                train_output = targets[index]*output.double()
+                train_output = get_constr_out(train_output, R_levels[index])
+                train_output = (1-targets[index])*constr_output.double() + targets[index]*train_output
+                loss = criterions[index](train_output, targets[index])
+
+                # target = targets[index].float()
+                # loss = criterions[index](output, target)
+
                 local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
@@ -241,7 +318,6 @@ def train_local(dataset_name, args):
         show_global_loss(global_train_loss, set="Train")
 
     model.eval()
-    local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
     local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
     local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
     Y_true_global = []
@@ -253,11 +329,7 @@ def train_local(dataset_name, args):
                 global_targets = global_targets.to("cpu")
             outputs = model(inputs.float())
 
-            total_val_loss = 0.0
             for index, (output, target) in enumerate(zip(outputs, targets)):
-                loss = criterions[index](output, target)
-                total_val_loss += loss
-                local_val_losses[index] += loss.item()
                 output = output.to("cpu")
                 target = target.to("cpu")
                 local_inputs[index].append(target)
@@ -289,5 +361,10 @@ def train_local(dataset_name, args):
     )
 
     print(score)
+    
+    create_dir("results")
+    f = open("results/" + dataset_name + ".csv", "a")
+    f.write(str(args.seed) + "," + str(epoch) + "," + str(score) + "\n")
+    f.close()
 
     return None

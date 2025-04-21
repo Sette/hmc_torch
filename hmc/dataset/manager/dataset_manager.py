@@ -241,6 +241,7 @@ class HMCDatasetManager:
         self.A = self.train.A
         self.to_eval = self.train.to_eval
         self.nodes = self.train.g.nodes()
+        self.nodes_idx = self.train.nodes_idx
         self.local_nodes_idx = self.train.local_nodes_idx
         self.max_depth = self.train.max_depth
         self.levels = self.train.levels

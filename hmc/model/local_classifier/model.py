@@ -3,18 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def transform_predictions(predictions):
-    transformed = []
-    # Loop through each index to form examples with the first element from each level
-    for i in range(len(predictions[0])):  # Iterate over the number of examples
-        example = []
-        for level in predictions:  # Iterate over the levels
-            example.append(level[i])  # Get the first element from each level at index i
-        transformed.append(example)
-
-    return transformed
-
-
 class ExpandOutputClassification(nn.Module):
     def __init__(self, input_shape=512, output_shape=512):
         super().__init__()
