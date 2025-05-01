@@ -8,7 +8,9 @@ from hmc.train.train_global import train_global
 from hmc.train.train_local import train_local
 from hmc.model.arguments import get_parser
 from hmc.utils.dir import create_job_id
-
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 def main():
     # Training settings

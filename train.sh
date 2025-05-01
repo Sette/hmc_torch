@@ -76,7 +76,7 @@ if [ "$DATASET" = "all" ]; then
         do
             echo "Running: python main.py --dataset $dataset --seed $SEED "
             # Controle de processos simultâneos
-            python -m hmc.train.main \
+            PYTHONPATH=src python -m hmc.train.main \
                 --datasets "$dataset" \
                 --dataset_path "$DATASET_PATH" \
                 --batch_size "$BATCH_SIZE" \
@@ -107,7 +107,7 @@ else
         do
             echo "Running: python main.py --dataset $DATASET --seed $SEED"
             # Controle de processos simultâneos
-            python -m hmc.train.main \
+            PYTHONPATH=src python -m hmc.train.main \
                 --datasets "$DATASET" \
                 --dataset_path "$DATASET_PATH" \
                 --batch_size "$BATCH_SIZE" \

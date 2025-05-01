@@ -3,6 +3,7 @@ name = "hmc"
 version = "0.0.5"
 description = "Hierarchical Multi-Label Classification Network in Pytorch"
 authors = ["sette <bruno.sette@ufscar.br>"]
+packages = [{ include = "hmc", from = "src" }]
 readme = "README.md"
 
 [tool.poetry.dependencies]
