@@ -68,6 +68,167 @@ def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
     return global_preds
 
 
+def run(
+        model,
+        hmc_dataset,
+        train_loader,
+        val_loader,
+        criterions,
+        optimizer,
+        device,
+        epochs=20,
+):
+    if torch.cuda.is_available():
+        model = model.to(device)
+        criterions = [criterion.to(device) for criterion in criterions]
+    early_stopping_patience = 3
+    best_val_loss = [float("inf")] * hmc_dataset.max_depth
+    patience_counters = [0] * hmc_dataset.max_depth
+    level_active = [True] * hmc_dataset.max_depth
+    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
+    local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+
+    epochs_to_eval = 10
+    count_epochs_eval = 0
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+        active_levels = [i for i, active in enumerate(level_active) if active]
+
+        if not active_levels:
+            print("All levels have triggered early stopping.")
+            break
+
+        for inputs, targets, _ in train_loader:
+            if torch.cuda.is_available():
+                inputs, targets = inputs.to("cuda"), [
+                    target.to("cuda") for target in targets
+                ]
+            outputs = model(inputs.float())
+
+            # Zerar os gradientes antes de cada batch
+            optimizer.zero_grad()
+
+            for index in active_levels:
+                output = outputs[index]
+                target = targets[index].float()
+
+                loss = criterions[index](output, target)
+                local_train_losses[index] += loss
+
+        # Backward pass (cálculo dos gradientes)
+        for total_loss in local_train_losses:
+            if total_loss > 0:
+                total_loss.backward()
+        optimizer.step()
+
+        local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
+        non_zero_losses = [loss for loss in local_train_losses if loss > 0]
+        global_train_loss = sum(non_zero_losses) / len(non_zero_losses) if non_zero_losses else 0
+
+        count_epochs_eval += 1
+        if count_epochs_eval >= epochs_to_eval:
+            count_epochs_eval = 0
+            # Avaliar o modelo a cada epochs_to_eval épocas
+            model.eval()
+            local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+            with torch.no_grad():
+                for inputs, targets, _ in val_loader:
+                    if torch.cuda.is_available():
+                        inputs, targets = inputs.to("cuda"), [
+                            target.to("cuda") for target in targets
+                        ]
+                    outputs = model(inputs.float())
+
+                    for index in active_levels:
+                        output = outputs[index]
+                        target = targets[index].float()
+
+                        loss = criterions[index](output, target)
+                        local_val_losses[index] += loss.item()
+
+            local_val_losses = [
+                loss / len(val_loader) for loss in local_val_losses
+            ]
+
+            for i in active_levels:
+                if round(local_val_losses[i], 3) < round(best_val_loss[i], 3):
+                    best_val_loss[i] = round(local_val_losses[i], 3)
+                    patience_counters[i] = 0
+                    print(f"Level {i}: improved (loss={local_val_losses[i]:.4f})")
+                else:
+                    patience_counters[i] += 1
+                    print(
+                        f"Level {i}: no improvement \
+                        (patience {patience_counters[i]}/{early_stopping_patience})"
+                    )
+                    if patience_counters[i] >= early_stopping_patience:
+                        level_active[i] = False
+                        print(
+                            f"🚫 Early stopping triggered for level {i} — freezing its parameters"
+                        )
+                        # ❄️ Congelar os parâmetros desse nível
+                        for param in model.levels[i].parameters():
+                            param.requires_grad = False
+
+        print(f"Epoch {epoch}/{epochs}")
+        show_local_losses(local_train_losses, set="Train")
+        show_global_loss(global_train_loss, set="Train")
+
+    model.eval()
+    local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
+    local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
+    local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
+    Y_true_global = []
+    with torch.no_grad():
+        for inputs, targets, global_targets in val_loader:
+            if torch.cuda.is_available():
+                inputs = inputs.to("cuda")
+                targets = [target.to("cuda").float() for target in targets]
+                global_targets = global_targets.to("cpu")
+            outputs = model(inputs.float())
+
+            total_val_loss = 0.0
+            for index, (output, target) in enumerate(zip(outputs, targets)):
+                loss = criterions[index](output, target)
+                total_val_loss += loss
+                local_val_losses[index] += loss.item()
+                output = output.to("cpu")
+                target = target.to("cpu")
+                local_inputs[index].append(target)
+                local_outputs[index].append(output)
+            Y_true_global.append(global_targets)
+        # Concat all outputs and targets by level
+    local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
+    local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
+
+    # Get local scores
+    local_val_score = [
+        average_precision_score(target, output, average="micro")
+        for target, output in zip(local_inputs, local_outputs)
+    ]
+    print(f"Local test score: {local_val_score}")
+    # Concat global targets
+    Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
+
+    Y_pred_global = local_to_global_predictions(
+        local_outputs, hmc_dataset.train.local_nodes_idx, hmc_dataset.train.nodes_idx
+    )
+
+    # Y_true_global_converted = local_to_global_predictions(
+    #     local_inputs, train.local_nodes_idx, train.nodes_idx
+    # )
+
+    score = average_precision_score(
+        Y_true_global_original[:, to_eval], Y_pred_global[:, to_eval], average="micro"
+    )
+
+    print(score)
+
+    return None
+
+
 def train_local(dataset_name, args):
     print(".......................................")
     print("Experiment with {} dataset ".format(dataset_name))
@@ -79,7 +240,6 @@ def train_local(dataset_name, args):
         dataset_name, device=args.device, dataset_type="arff", is_global=False
     )
     train, valid, test = hmc_dataset.get_datasets()
-    to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
     experiment = True
 
     if experiment:
@@ -172,122 +332,13 @@ def train_local(dataset_name, args):
 
     criterions = [nn.BCELoss() for _ in hmc_dataset.levels_size]
 
-    if torch.cuda.is_available():
-        model = model.to(device)
-        criterions = [criterion.to("cuda") for criterion in criterions]
-
-    early_stopping_patience = 3
-    best_train_losses = [float("inf")] * hmc_dataset.max_depth
-    patience_counters = [0] * hmc_dataset.max_depth
-    level_active = [True] * hmc_dataset.max_depth
-
-    for epoch in range(1, args.num_epochs + 1):
-        model.train()
-        local_train_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
-        active_levels = [i for i, active in enumerate(level_active) if active]
-
-        if not active_levels:
-            print("All levels have triggered early stopping.")
-            break
-
-        for inputs, targets, _ in train_loader:
-            if torch.cuda.is_available():
-                inputs, targets = inputs.to("cuda"), [
-                    target.to("cuda") for target in targets
-                ]
-            outputs = model(inputs.float())
-
-            # Zerar os gradientes antes de cada batch
-            optimizer.zero_grad()
-
-            for index in active_levels:
-                output = outputs[index]
-                target = targets[index].float()
-
-                loss = criterions[index](output, target)
-                local_train_losses[index] += loss
-
-        # Backward pass (cálculo dos gradientes)
-        [total_loss.backward() for total_loss in local_train_losses if total_loss > 0]
-        optimizer.step()
-
-        local_train_losses = [loss / len(train_loader) for loss in local_train_losses]
-        global_train_loss = sum(local_train_losses) / hmc_dataset.max_depth
-
-        print(f"\nEpoch {epoch}/{args.num_epochs}")
-
-        for i in active_levels:
-            if round(local_train_losses[i].item(), 3) < round(best_train_losses[i], 3):
-                best_train_losses[i] = round(local_train_losses[i].item(), 3)
-                patience_counters[i] = 0
-                print(f"Level {i}: improved (loss={local_train_losses[i].item():.4f})")
-            else:
-                patience_counters[i] += 1
-                print(
-                    f"Level {i}: no improvement \
-                    (patience {patience_counters[i]}/{early_stopping_patience})"
-                )
-                if patience_counters[i] >= early_stopping_patience:
-                    level_active[i] = False
-                    print(
-                        f"🚫 Early stopping triggered for level {i} — freezing its parameters"
-                    )
-                    # ❄️ Congelar os parâmetros desse nível
-                    for param in model.levels[i].parameters():
-                        param.requires_grad = False
-
-        print(f"Epoch {epoch}/{args.num_epochs}")
-        show_local_losses(local_train_losses, set="Train")
-        show_global_loss(global_train_loss, set="Train")
-
-    model.eval()
-    local_val_losses = [0.0 for _ in range(hmc_dataset.max_depth)]
-    local_inputs = [[] for _ in range(hmc_dataset.max_depth)]
-    local_outputs = [[] for _ in range(hmc_dataset.max_depth)]
-    Y_true_global = []
-    with torch.no_grad():
-        for inputs, targets, global_targets in test_loader:
-            if torch.cuda.is_available():
-                inputs = inputs.to("cuda")
-                targets = [target.to("cuda").float() for target in targets]
-                global_targets = global_targets.to("cpu")
-            outputs = model(inputs.float())
-
-            total_val_loss = 0.0
-            for index, (output, target) in enumerate(zip(outputs, targets)):
-                loss = criterions[index](output, target)
-                total_val_loss += loss
-                local_val_losses[index] += loss.item()
-                output = output.to("cpu")
-                target = target.to("cpu")
-                local_inputs[index].append(target)
-                local_outputs[index].append(output)
-            Y_true_global.append(global_targets)
-        # Concat all outputs and targets by level
-    local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
-    local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
-
-    # Get local scores
-    local_val_score = [
-        average_precision_score(target, output, average="micro")
-        for target, output in zip(local_inputs, local_outputs)
-    ]
-    print(f"Local test score: {local_val_score}")
-    # Concat global targets
-    Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
-
-    Y_pred_global = local_to_global_predictions(
-        local_outputs, train.local_nodes_idx, train.nodes_idx
+    run(
+        model,
+        hmc_dataset,
+        train_loader,
+        test_loader,
+        criterions,
+        optimizer,
+        device,
+        args.num_epochs,
     )
-
-    # Y_true_global_converted = local_to_global_predictions(
-    #     local_inputs, train.local_nodes_idx, train.nodes_idx
-    # )
-
-    score = average_precision_score(
-        Y_true_global_original[:, to_eval], Y_pred_global[:, to_eval], average="micro"
-    )
-
-    print(score)
-
-    return None
