@@ -25,7 +25,6 @@ name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
 priority = "explicit"
 
-
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.2"
 flake8 = "^7.2.0"
