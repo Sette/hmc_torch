@@ -143,7 +143,3 @@ The project has a total of 8 commits, with the latest updates made on August 25,
 ## Conclusion
 The HMC Torch project is structured to facilitate the development and implementation of hierarchical multi-label classification models using PyTorch. The recent updates have streamlined the codebase and improved project organization.
 
-## Related Questions
-- What are the main applications of hierarchical multi-label classification?
-- How does PyTorch facilitate deep learning model construction?
-- What are best practices for managing versions in open-source projects?
