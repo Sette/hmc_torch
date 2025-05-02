@@ -1,15 +1,16 @@
 import os
-import torch
 import random
-import torch.utils.data
-import numpy as np
-
-from hmc.train.train_global import train_global
-from hmc.train.train_local import train_local
-from hmc.model.arguments import get_parser
-from hmc.utils.dir import create_job_id
 import sys
 from pathlib import Path
+
+import numpy as np
+import torch
+import torch.utils.data
+
+from hmc.model.arguments import get_parser
+from hmc.train.train_global import train_global
+from hmc.train.train_local import train_local
+from hmc.utils.dir import create_job_id
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 

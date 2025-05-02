@@ -1,6 +1,6 @@
-import os
-import json
 import datetime
+import json
+import os
 
 
 def create_dir(path):

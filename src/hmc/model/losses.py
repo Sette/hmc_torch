@@ -17,9 +17,7 @@ def show_global_loss(global_loss, set="Train"):
 class MaskedBCELoss(nn.Module):
     def __init__(self):
         super(MaskedBCELoss, self).__init__()
-        self.bce_loss = nn.BCELoss(
-            reduction="none"
-        )  # Redução 'none' para manter a forma do tensor
+        self.bce_loss = nn.BCELoss(reduction="none")  # Redução 'none' para manter a forma do tensor
 
     def forward(self, outputs, targets):
         losses = []

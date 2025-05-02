@@ -1,15 +1,16 @@
-from sklearn.metrics import average_precision_score
-from hmc.model.global_classifier.model import ConstrainedFFNNModel, get_constr_out
+import networkx as nx
+import numpy as np
+import torch
+import torch.nn as nn
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
-import torch
+from sklearn.metrics import average_precision_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import torch.nn as nn
-import numpy as np
-import networkx as nx
-from hmc.utils.dir import create_dir
+
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
+from hmc.model.global_classifier.model import ConstrainedFFNNModel, get_constr_out
+from hmc.utils.dir import create_dir
 
 
 def train_global(dataset_name, args):
@@ -19,9 +20,7 @@ def train_global(dataset_name, args):
     device = torch.device(args.device)
     data, ontology = dataset_name.split("_")
 
-    hmc_dataset = initialize_dataset_experiments(
-        dataset_name, device=args.device, dataset_type="arff", is_global=True
-    )
+    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type="arff", is_global=True)
     train, valid, test = hmc_dataset.get_datasets()
     to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
 
@@ -52,9 +51,7 @@ def train_global(dataset_name, args):
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is descendant of class j
     R = np.zeros(hmc_dataset.A.shape)
     np.fill_diagonal(R, 1)
-    g = nx.DiGraph(
-        hmc_dataset.A
-    )  # train.A is the matrix where the direct connections are stored
+    g = nx.DiGraph(hmc_dataset.A)  # train.A is the matrix where the direct connections are stored
     for i in range(len(hmc_dataset.A)):
         # here we need to use the function nx.descendants() \
         # because in the directed graph the edges have source \
@@ -68,19 +65,15 @@ def train_global(dataset_name, args):
     R = R.unsqueeze(0).to(device)
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy="mean").fit(
-        np.concatenate((train.X, valid.X))
-    )
-    valid.X, valid.Y = torch.tensor(
-        scaler.transform(imp_mean.transform(valid.X))
-    ).clone().detach().to(device), torch.tensor(valid.Y).clone().detach().to(device)
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy="mean").fit(np.concatenate((train.X, valid.X)))
+    valid.X = torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(device)
+    valid.Y = torch.tensor(valid.Y).clone().detach().to(device)
 
-    train.X, train.Y = torch.tensor(
-        scaler.transform(imp_mean.transform(train.X))
-    ).clone().detach().to(device), torch.tensor(train.Y).clone().detach().to(device)
-    test.X, test.Y = torch.as_tensor(
-        scaler.transform(imp_mean.transform(test.X))
-    ).clone().detach().to(device), torch.as_tensor(test.Y).clone().detach().to(device)
+    train.X = torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(device)
+    train.Y = torch.tensor(train.Y).clone().detach().to(device)
+
+    test.X = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(device)
+    test.Y = torch.as_tensor(test.Y).clone().detach().to(device)
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
@@ -90,12 +83,8 @@ def train_global(dataset_name, args):
             train_dataset.append((x, y))
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
 
-    train_loader = DataLoader(
-        dataset=train_dataset, batch_size=args.batch_size, shuffle=True
-    )
-    test_loader = DataLoader(
-        dataset=test_dataset, batch_size=args.batch_size, shuffle=False
-    )
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
 
     num_epochs = args.num_epochs
     if "GO" in dataset_name:
@@ -114,9 +103,7 @@ def train_global(dataset_name, args):
     model = model.to(device)
     to_eval = to_eval.to(device)
 
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.BCELoss()
 
     # Set patience
@@ -181,9 +168,7 @@ def train_global(dataset_name, args):
             constr_test = torch.cat((constr_test, cpu_constrained_output), dim=0)
             y_test = torch.cat((y_test, y), dim=0)
 
-    score = average_precision_score(
-        y_test[:, to_eval], constr_test.data[:, to_eval], average="micro"
-    )
+    score = average_precision_score(y_test[:, to_eval], constr_test.data[:, to_eval], average="micro")
     create_dir("results")
     f = open("results/" + dataset_name + ".csv", "a")
     f.write(str(args.seed) + "," + str(epoch) + "," + str(score) + "\n")

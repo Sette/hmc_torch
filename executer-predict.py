@@ -1,9 +1,11 @@
 # %%
-import os
 import json
-import torch
+import os
 from datetime import UTC
 from datetime import datetime as dt
+
+import torch
+
 from hmc.model import ClassificationModel
 
 base_path = "/kaggle/input/fma-large-by-effnet-discogs-rock-and-electronic/trains"
@@ -59,8 +61,6 @@ predict = model.predict(testset_path=testset_path, batch_size=64)
 time_end = dt.now(UTC)
 time_elapsed = time_end - time_start
 print(".......................................")
-print(
-    "[{}] Predict finished at {} / elapsed time {}s".format(
-        id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()
-    )
-)
+
+string_format = "[{}] Predict finished at {} / elapsed time {}s"
+print(string_format.format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))

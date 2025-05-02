@@ -2,19 +2,19 @@
 This code was adapted from https://github.com/lucamasera/AWX
 """
 
+import json
+import logging
+import math
+import os
+from itertools import chain
+
+import keras
 import numpy as np
 import pandas as pd
-import keras
-from itertools import chain
-import json
-import os
-from hmc.utils import create_dir
 import torch
-import math
-import logging
 
-from hmc.dataset.datasets.gofun import HMCDatasetCsv, HMCDatasetArff
-
+from hmc.dataset.datasets.gofun import HMCDatasetArff, HMCDatasetCsv
+from hmc.utils import create_dir
 
 # Criar um logger
 logger = logging.getLogger(__name__)
@@ -123,45 +123,28 @@ class arff_data_to_csv:
                             all_terms.append(branch)
 
                     else:
-                        _, f_name, f_type = l.split()
+                        _, _, f_type = l.split()
 
                         if f_type == "numeric" or f_type == "NUMERIC":
                             d.append([])
                             cats_lens.append(1)
-                            feature_types.append(
-                                lambda x, i: [float(x)] if x != "?" else [np.nan]
-                            )
+                            feature_types.append(lambda x, i: [float(x)] if x != "?" else [np.nan])
 
                         else:
                             cats = f_type[1:-1].split(",")
                             cats_lens.append(len(cats))
-                            d.append(
-                                {
-                                    key: keras.utils.to_categorical(
-                                        i, len(cats)
-                                    ).tolist()
-                                    for i, key in enumerate(cats)
-                                }
-                            )
-                            feature_types.append(
-                                lambda x, i: d[i].get(x, [0.0] * cats_lens[i])
-                            )
+                            cat_dict = dict()
+                            for i, key in enumerate(cats):
+                                cat_dict[key] = keras.utils.to_categorical(i, len(cats)).tolist()
+                            d.append(cat_dict)
+                            feature_types.append(lambda x, i: d[i].get(x, [0.0] * cats_lens[i]))
                 elif l.startswith("@DATA"):
                     read_data = True
                 elif read_data:
                     d_line = l.split("%")[0].strip().split(",")
                     lab = d_line[len(feature_types)].replace("/", ".").strip()
 
-                    X.append(
-                        list(
-                            chain(
-                                *[
-                                    feature_types[i](x, i)
-                                    for i, x in enumerate(d_line[: len(feature_types)])
-                                ]
-                            )
-                        )
-                    )
+                    X.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[: len(feature_types)])])))
 
                     # for t in lab.split('@'):
                     #    y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1

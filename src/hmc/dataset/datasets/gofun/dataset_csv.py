@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # @Author  : settebr
 # @File    : dataset_csv.py
-import pandas as pd
-import numpy as np
 import ast
 import os
+
+import numpy as np
+import pandas as pd
 
 
 def load_and_concat_csv_files(directory, sep="|"):
