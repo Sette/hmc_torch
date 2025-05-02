@@ -21,25 +21,25 @@ NUM_EPOCHS=400
 OUTPUT_PATH="/home/bruno/storage/models/gofun"
 METHOD="local"
 
-# Função para exibir ajuda
+# Function to display help
 usage() {
-    echo "Uso: $0 [opções]"
+    echo "Usage: $0 [options]"
     echo ""
-    echo "Opções disponíveis:"
-    echo "  --dataset <nome>          Nome do dataset (default: $DATASET)"
-    echo "  --dataset_path <caminho>  Caminho do dataset (default: $DATASET_PATH)"
-    echo "  --batch_size <num>        Tamanho do batch (default: $BATCH_SIZE)"
-    echo "  --lr <valor>              Taxa de aprendizado (default: $LR)"
-    echo "  --dropout <valor>         Taxa de dropout (default: $DROPOUT)"
-    echo "  --hidden_dim <num>        Dimensão oculta (default: $HIDDEN_DIM)"
-    echo "  --num_layers <num>        Número de camadas (default: $NUM_LAYERS)"
-    echo "  --weight_decay <valor>    Decaimento de peso (default: $WEIGHT_DECAY)"
-    echo "  --non_lin <função>        Função de ativação (default: $NON_LIN)"
-    echo "  --device <tipo>           Dispositivo (cuda/cpu) (default: $DEVICE)"
-    echo "  --num_epochs <num>        Número de épocas (default: $NUM_EPOCHS)"
-    echo "  --output_path <caminho>   Caminho de saída dos modelos (default: $OUTPUT_PATH)"
-    echo "  --method <metodo>         Método de treinamento (default: $METHOD)"
-    echo "  --help                    Exibe esta mensagem e sai"
+    echo "Available options:"
+    echo "  --dataset <name>          Dataset name (default: $DATASET)"
+    echo "  --dataset_path <path>     Dataset path (default: $DATASET_PATH)"
+    echo "  --batch_size <num>        Batch size (default: $BATCH_SIZE)"
+    echo "  --lr <value>              Learning rate (default: $LR)"
+    echo "  --dropout <value>         Dropout rate (default: $DROPOUT)"
+    echo "  --hidden_dim <num>        Hidden dimension (default: $HIDDEN_DIM)"
+    echo "  --num_layers <num>        Number of layers (default: $NUM_LAYERS)"
+    echo "  --weight_decay <value>    Weight decay (default: $WEIGHT_DECAY)"
+    echo "  --non_lin <function>      Activation function (default: $NON_LIN)"
+    echo "  --device <type>           Device (cuda/cpu) (default: $DEVICE)"
+    echo "  --num_epochs <num>        Number of epochs (default: $NUM_EPOCHS)"
+    echo "  --output_path <path>      Output path for models (default: $OUTPUT_PATH)"
+    echo "  --method <method>         Training method (default: $METHOD)"
+    echo "  --help                    Display this message and exit"
     exit 0
 }
 
@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
         --output_path) OUTPUT_PATH="$2"; shift ;;
         --method) METHOD="$2"; shift ;;
         --help) usage ;;
-        *) echo "Opção inválida: $1"; usage ;;
+        *) echo "Invalid option: $1"; usage ;;
     esac
     shift
 done
@@ -74,7 +74,7 @@ if [ "$DATASET" = "all" ]; then
         # Loop para executar com diferentes seeds
         for SEED in 0
         do
-            echo "Running: python main.py --dataset $dataset --seed $SEED "
+            echo "Running with arguments: --datasets $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout $DROPOUT --hidden_dim $HIDDEN_DIM --num_layers $NUM_LAYERS --weight_decay $WEIGHT_DECAY --non_lin $NON_LIN --device $DEVICE --num_epochs $NUM_EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
             # Controle de processos simultâneos
             PYTHONPATH=src python -m hmc.train.main \
                 --datasets "$dataset" \
@@ -105,7 +105,7 @@ if [ "$DATASET" = "all" ]; then
 else
     for SEED in 0
         do
-            echo "Running: python main.py --dataset $DATASET --seed $SEED"
+            echo "Running with arguments: --datasets $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout $DROPOUT --hidden_dim $HIDDEN_DIM --num_layers $NUM_LAYERS --weight_decay $WEIGHT_DECAY --non_lin $NON_LIN --device $DEVICE --num_epochs $NUM_EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
             # Controle de processos simultâneos
             PYTHONPATH=src python -m hmc.train.main \
                 --datasets "$DATASET" \
