@@ -7,11 +7,11 @@ from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
 from torch.utils.data import DataLoader
 
-from hmc.dataset.manager import initialize_dataset_experiments
-from hmc.model.global_classifier import ConstrainedFFNNModelPL
+from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
+from hmc.model.global_classifier.model import ConstrainedFFNNLightningModel
 
 
-def train_globalPL(dataset_name, args):
+def train_globalLM(dataset_name, args):
     print(".......................................")
     print("Experiment with {} dataset ".format(dataset_name))
     # Load train, val and test set
@@ -79,25 +79,21 @@ def train_globalPL(dataset_name, args):
 
     # Create loaders
     train_dataset = [(x, y) for (x, y) in zip(train.X, train.Y)]
-    if "others" not in args.datasets:
-        # val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
-        for x, y in zip(valid.X, valid.Y):
-            train_dataset.append((x, y))
+
+    val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
+
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
-    # val_dataset = [(x, y) for (x, y) in zip(valid.X, valid.Y)]
 
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
-    # val_loader = DataLoader(
-    #     dataset=val_dataset, batch_size=args.batch_size, shuffle=False
-    # )
+    val_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
 
     if "GO" in dataset_name:
         num_to_skip = 4
     else:
         num_to_skip = 1
 
-    model = ConstrainedFFNNModelPL(
+    model = ConstrainedFFNNLightningModel(
         input_dim=args.input_dims[data],
         hidden_dim=args.hidden_dim,
         output_dim=args.output_dims[ontology][data] + num_to_skip,
@@ -115,5 +111,5 @@ def train_globalPL(dataset_name, args):
         callbacks=[EarlyStopping(monitor="train_loss", patience=20, mode="max")],
     )
 
-    trainer.fit(model, train_loader)
+    trainer.fit(model, train_loader, val_loader)
     trainer.test(model, test_loader)

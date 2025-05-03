@@ -9,6 +9,7 @@ import torch.utils.data
 
 from hmc.model.arguments import get_parser
 from hmc.train.train_global import train_global
+from hmc.train.train_globalLM import train_globalLM
 from hmc.train.train_local import train_local
 from hmc.utils.dir import create_job_id
 
@@ -195,6 +196,9 @@ def main():
 
         if args.method == "local":
             train_local(dataset_name, args)
+
+        if args.method == "globalLM":
+            train_globalLM(dataset_name, args)
 
 
 if __name__ == "__main__":

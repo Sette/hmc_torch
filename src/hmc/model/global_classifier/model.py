@@ -77,7 +77,7 @@ class ConstrainedFFNNModel(nn.Module):
         return constrained_out
 
 
-class ConstrainedFFNNModelPL(LightningModule):
+class ConstrainedFFNNLightningModel(LightningModule):
     def __init__(
         self,
         input_dim,

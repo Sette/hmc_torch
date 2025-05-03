@@ -56,10 +56,13 @@ class BuildClassification(nn.Module):
 
 
 class HMCLocalClassificationModel(nn.Module):
-    def __init__(self, levels_size, input_size=1280, hidden_size=640, hyperparams={}):
+    def __init__(self, levels_size, input_size=1280, hidden_size=640, num_layers=2, dropout=0.5):
         super(HMCLocalClassificationModel, self).__init__()
         self.input_size = input_size
         self.levels_size = levels_size
+        self.mum_layers = num_layers
+        self.hidden_size = hidden_size
+        self.dropout = dropout
         self.levels = nn.ModuleList()
         for level_size in levels_size.values():
             self.levels.append(BuildClassification(input_size, hidden_size, level_size))
@@ -71,18 +74,18 @@ class HMCLocalClassificationModel(nn.Module):
             outputs.append(local_output)
         return outputs
 
-    # def forward(self, x):
-    #     outputs = []
-    #     current_input = x
-    #     current_output = current_input
-    #     for i, level in enumerate(self.levels):
-    #         if i != 0:
-    #             current_input = torch.cat((current_output.detach(), x), dim=1)
-    #         local_output = level(current_input)
-    #         outputs.append(local_output)
-    #         current_output = self.output_normalization[i](local_output)
-    #     return outputs
-    """
+        # def forward(self, x):
+        #     outputs = []
+        #     current_input = x
+        #     current_output = current_input
+        #     for i, level in enumerate(self.levels):
+        #         if i != 0:
+        #             current_input = torch.cat((current_output.detach(), x), dim=1)
+        #         local_output = level(current_input)
+        #         outputs.append(local_output)
+        #         current_output = self.output_normalization[i](local_output)
+        #     return outputs
+        """
     def predict(self, base_path, batch_size=64):
         torch_path = os.path.join(base_path, 'torch')
         test_torch_path = os.path.join(torch_path, 'test')

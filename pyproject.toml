@@ -21,6 +21,8 @@ keras = "^3.9.0"
 tensorflow = "^2.19.0"
 
 # Fontes do PyTorch (ajustadas no deploy.sh)
+litmodels = "^0.1.7"
+optuna = "^4.3.0"
 [[tool.poetry.source]]
 name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
