@@ -5,11 +5,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.utils.data
 
 from hmc.model.arguments import get_parser
 from hmc.train.train_global import train_global
 from hmc.train.train_globalLM import train_globalLM
+from hmc.train.train_global_baseline import train_global_baseline
 from hmc.train.train_local import train_local
 from hmc.utils.dir import create_job_id
 
@@ -199,6 +199,9 @@ def main():
 
         if args.method == "globalLM":
             train_globalLM(dataset_name, args)
+
+        if args.method == "global_baseline":
+            train_global_baseline(dataset_name, args)
 
 
 if __name__ == "__main__":

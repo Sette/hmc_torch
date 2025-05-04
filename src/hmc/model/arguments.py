@@ -57,7 +57,8 @@ def get_parser():
         "--method",
         type=str,
         default="global",
-        choices=["global", "local", "globalLM"],
+        choices=["global", "local", "globalLM", "global_baseline"],
+        metavar="METHOD",
         help="Method type to use.",
     )
     return parser

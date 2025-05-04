@@ -9,11 +9,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
-from hmc.model.global_classifier.constrained.model import ConstrainedFFNNModel, get_constr_out
+from hmc.model.global_classifier.baseline.model import BaselineFFNNModel
 from hmc.utils.dir import create_dir
 
 
-def train_global(dataset_name, args):
+def train_global_baseline(dataset_name, args):
     print(".......................................")
     print("Experiment with {} dataset ".format(dataset_name))
     # Load train, val and test set
@@ -93,7 +93,7 @@ def train_global(dataset_name, args):
         num_to_skip = 1
 
     # Create the model
-    model = ConstrainedFFNNModel(
+    model = BaselineFFNNModel(
         args.input_dims[data],
         args.hidden_dim,
         args.output_dims[ontology][data] + num_to_skip,
@@ -122,14 +122,14 @@ def train_global(dataset_name, args):
             output = model(x.float())
 
             # MCLoss
-            constr_output = get_constr_out(output, R)
-            train_output = labels * output.double()
-            train_output = get_constr_out(train_output, R)
-            train_output = (1 - labels) * constr_output.double() + labels * train_output
+            # constr_output = get_constr_out(output, R)
+            # train_output = labels * output.double()
+            # train_output = get_constr_out(train_output, R)
+            # train_output = (1 - labels) * constr_output.double() + labels * train_output
 
-            loss = criterion(train_output[:, to_eval], labels[:, to_eval])
+            loss = criterion(output[:, to_eval].double(), labels[:, to_eval])
 
-            predicted = constr_output.data > 0.5
+            predicted = output.data > 0.5
 
             # Total number of labels
             # total_train = labels.size(0) * labels.size(1)
@@ -168,8 +168,9 @@ def train_global(dataset_name, args):
             constr_test = torch.cat((constr_test, cpu_constrained_output), dim=0)
             y_test = torch.cat((y_test, y), dim=0)
 
-    score = average_precision_score(y_test[:, to_eval], constr_test.data[:, to_eval], average="micro")
-    create_dir("results/results_constrained")
-    f = open("results/results_constrained/" + dataset_name + ".csv", "a")
+    score = average_precision_score(y_test[:, to_eval].double(), constr_test.data[:, to_eval], average="micro")
+    # create_dir("results")
+    create_dir("results/results_baseline")
+    f = open("results/results_baseline/" + dataset_name + ".csv", "a")
     f.write(str(args.seed) + "," + str(epoch) + "," + str(score) + "\n")
     f.close()
