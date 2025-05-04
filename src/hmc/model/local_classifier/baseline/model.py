@@ -1,6 +1,4 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 def transform_predictions(predictions):
@@ -27,28 +25,15 @@ class ExpandOutputClassification(nn.Module):
         return x
 
 
-class OutputNormalization(nn.Module):
-    def __init__(self):
-        super(OutputNormalization, self).__init__()
-
-    def forward(self, x):
-        # Obtém o índice do maior valor em cada linha (axis=1)
-        max_indices = torch.argmax(x, dim=1)
-        # Converte para one-hot encoding
-        one_hot_output = F.one_hot(max_indices, num_classes=x.size(1))
-        return one_hot_output.to(x.dtype)
-
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
-
 class BuildClassification(nn.Module):
-    def __init__(self, input_shape, hidden_size, output_size):
+    def __init__(self, input_shape, hidden_size, output_size, dropout_rate=0.5):
         super(BuildClassification, self).__init__()
         self.classifier = nn.Sequential(
             nn.Linear(input_shape, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
             nn.Linear(hidden_size, output_size),
-            nn.Sigmoid(),
+            nn.Sigmoid(),  # Sigmoid for binary classification
         )
 
     def forward(self, x):

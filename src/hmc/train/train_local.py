@@ -6,7 +6,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import average_precision_score
 from torch.utils.data import DataLoader
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
-from hmc.model.local_classifier.model import HMCLocalClassificationModel
+from hmc.model.local_classifier.baseline.model import HMCLocalClassificationModel
 from hmc.model.losses import show_global_loss, show_local_losses
 import optuna
 
