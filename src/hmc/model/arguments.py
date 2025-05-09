@@ -87,7 +87,8 @@ def get_parser():
         default="false",
         choices=["true", "false"],
         metavar="HPO",
-        help="Enable or disable Hyperparameter Optimization (HPO). Use 'true' to enable and 'false' to disable.",
+        help="Enable or disable Hyperparameter Optimization (HPO). \
+            Use 'true' to enable and 'false' to disable.",
     )
 
     return parser
