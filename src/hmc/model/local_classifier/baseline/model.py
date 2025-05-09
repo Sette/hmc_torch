@@ -54,23 +54,42 @@ class BuildClassification(nn.Module):
         return self.classifier(x)
 
 
-class HMCLocalClassificationModel(nn.Module):
-    def __init__(self, levels_size, input_size=1280, hidden_size=640, num_layers=2, dropout=0.5):
-        super(HMCLocalClassificationModel, self).__init__()
+class HMCLocalModel(nn.Module):
+    def __init__(
+        self,
+        levels_size,
+        input_size=None,
+        hidden_size=None,
+        num_layers=None,
+        dropout=None,
+    ):
+        super(HMCLocalModel, self).__init__()
+        if not input_size:
+            print("input_size is None, error in HMCLocalClassificationModel")
+            raise ValueError("input_size is None")
+        if not levels_size:
+            print("levels_size is None, error in HMCLocalClassificationModel")
+            raise ValueError("levels_size is None")
+        if not isinstance(levels_size, dict):
+            print("levels_size is not a dict, error in HMCLocalClassificationModel")
+            raise ValueError("levels_size is not a dict")
+
         self.input_size = input_size
         self.levels_size = levels_size
         self.mum_layers = num_layers
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.levels = nn.ModuleList()
-        for level_size in levels_size.values():
+        self.max_depth = len(levels_size)
+
+        for index, level_size in enumerate(levels_size.values()):
             self.levels.append(
                 BuildClassification(
-                    input_size,
-                    hidden_size,
-                    level_size,
-                    nb_layers=num_layers,
-                    dropout_rate=dropout,
+                    input_shape=input_size,
+                    hidden_size=hidden_size[index],
+                    output_size=level_size,
+                    nb_layers=num_layers[index],
+                    dropout_rate=dropout[index],
                 )
             )
 

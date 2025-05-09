@@ -8,7 +8,7 @@ from sklearn.impute import SimpleImputer
 from torch.utils.data import DataLoader
 
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
-from hmc.model.global_classifier.constrained.model import ConstrainedFFNNLightningModel
+from hmc.model.global_classifier.constrained.model import ConstrainedLightningModel
 
 
 def train_globalLM(dataset_name, args):
@@ -19,7 +19,9 @@ def train_globalLM(dataset_name, args):
     data, ontology = dataset_name.split("_")
 
     # Load dataset paths
-    hmc_dataset = initialize_dataset_experiments(dataset_name, device=args.device, dataset_type="arff", is_global=True)
+    hmc_dataset = initialize_dataset_experiments(
+        dataset_name, device=args.device, dataset_type="arff", is_global=True
+    )
     train, valid, test = hmc_dataset.get_datasets()
     to_eval = torch.as_tensor(hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
 
@@ -49,7 +51,9 @@ def train_globalLM(dataset_name, args):
     # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is descendant of class j
     R = np.zeros(hmc_dataset.A.shape)
     np.fill_diagonal(R, 1)
-    g = nx.DiGraph(hmc_dataset.A)  # train.A is the matrix where the direct connections are stored
+    g = nx.DiGraph(
+        hmc_dataset.A
+    )  # train.A is the matrix where the direct connections are stored
     for i in range(len(hmc_dataset.A)):
         ancestors = list(
             nx.descendants(
@@ -68,13 +72,30 @@ def train_globalLM(dataset_name, args):
     R = R.unsqueeze(0).to(device)
 
     scaler = preprocessing.StandardScaler().fit(np.concatenate((train.X, valid.X)))
-    imp_mean = SimpleImputer(missing_values=np.nan, strategy="mean").fit(np.concatenate((train.X, valid.X)))
-    valid.X = (torch.tensor(scaler.transform(imp_mean.transform(valid.X))).clone().detach().to(device),)
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy="mean").fit(
+        np.concatenate((train.X, valid.X))
+    )
+    valid.X = (
+        torch.tensor(scaler.transform(imp_mean.transform(valid.X)))
+        .clone()
+        .detach()
+        .to(device),
+    )
     valid.Y = torch.tensor(valid.Y).clone().detach().to(device)
 
-    train.X = (torch.tensor(scaler.transform(imp_mean.transform(train.X))).clone().detach().to(device),)
+    train.X = (
+        torch.tensor(scaler.transform(imp_mean.transform(train.X)))
+        .clone()
+        .detach()
+        .to(device),
+    )
     train.Y = torch.tensor(train.Y).clone().detach().to(device)
-    test.X = torch.as_tensor(scaler.transform(imp_mean.transform(test.X))).clone().detach().to(device)
+    test.X = (
+        torch.as_tensor(scaler.transform(imp_mean.transform(test.X)))
+        .clone()
+        .detach()
+        .to(device)
+    )
     test.Y = torch.as_tensor(test.Y).clone().detach().to(device)
 
     # Create loaders
@@ -84,16 +105,22 @@ def train_globalLM(dataset_name, args):
 
     test_dataset = [(x, y) for (x, y) in zip(test.X, test.Y)]
 
-    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(
+        dataset=train_dataset, batch_size=args.batch_size, shuffle=True
+    )
+    test_loader = DataLoader(
+        dataset=test_dataset, batch_size=args.batch_size, shuffle=False
+    )
+    val_loader = DataLoader(
+        dataset=val_dataset, batch_size=args.batch_size, shuffle=False
+    )
 
     if "GO" in dataset_name:
         num_to_skip = 4
     else:
         num_to_skip = 1
 
-    model = ConstrainedFFNNLightningModel(
+    model = ConstrainedLightningModel(
         input_dim=args.input_dims[data],
         hidden_dim=args.hidden_dim,
         output_dim=args.output_dims[ontology][data] + num_to_skip,

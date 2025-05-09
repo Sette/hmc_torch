@@ -47,7 +47,9 @@ def create_reports(results, y_true, labels, max_depth):
         level_name = f"level{i + 1}"
         y_test_bin = [label[level_name].tolist() for label in y_true]
         fscore[i].append(f1_score(results[i], y_test_bin, average="weighted"))
-        reports[i] = create_report_metrics(results[i], y_test_bin, list(labels[level_name].keys()))
+        reports[i] = create_report_metrics(
+            results[i], y_test_bin, list(labels[level_name].keys())
+        )
 
     return reports, fscore
 

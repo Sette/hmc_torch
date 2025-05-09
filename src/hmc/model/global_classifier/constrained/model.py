@@ -112,7 +112,9 @@ class ConstrainedLightningModel(LightningModule):
 
         constrained_output = self.model(x.float())
 
-        self.val_outputs.append({"constr_output": constrained_output.cpu(), "y": y.cpu()})
+        self.val_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
     def test_step(self, batch):
         x, y = batch
@@ -120,7 +122,9 @@ class ConstrainedLightningModel(LightningModule):
 
         constrained_output = self.model(x.float())
 
-        self.test_outputs.append({"constr_output": constrained_output.cpu(), "y": y.cpu()})
+        self.test_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
     def on_test_epoch_end(self):
         """Processa os resultados e salva em `lightning_logs`."""
@@ -130,11 +134,15 @@ class ConstrainedLightningModel(LightningModule):
         constr_test = torch.cat([x["constr_output"] for x in self.test_outputs], dim=0)
         y_test = torch.cat([x["y"] for x in self.test_outputs], dim=0)
 
-        score = average_precision_score(y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro")
+        score = average_precision_score(
+            y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro"
+        )
         self.log("test_score", score, prog_bar=True, logger=True)
 
         # 📁 Obtém o diretório do Lightning Logs
-        log_dir = self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        log_dir = (
+            self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        )
         results_path = os.path.join(log_dir, "results.csv")
 
         # 🔥 Cria o diretório se não existir
@@ -159,5 +167,7 @@ class ConstrainedLightningModel(LightningModule):
         self.log("val_score", score, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
         return optimizer

@@ -191,11 +191,12 @@ def main():
     # args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     for dataset_name in datasets:
+        args.dataset_name = dataset_name
         if args.method == "global":
             train_global(dataset_name, args)
 
         if args.method == "local":
-            train_local(dataset_name, args)
+            train_local(args)
 
         if args.method == "globalLM":
             train_globalLM(dataset_name, args)
