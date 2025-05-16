@@ -3,6 +3,7 @@ name = "hmc"
 version = "0.0.5"
 description = "Hierarchical Multi-Label Classification Network in Pytorch"
 authors = ["sette <bruno.sette@ufscar.br>"]
+packages = [{ include = "hmc", from = "src" }]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -20,12 +21,17 @@ keras = "^3.9.0"
 tensorflow = "^2.19.0"
 
 # Fontes do PyTorch (ajustadas no deploy.sh)
+litmodels = "^0.1.7"
+optuna = "^4.3.0"
 [[tool.poetry.source]]
 name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu118"
-priority = "supplemental"
+priority = "explicit"
 
-[[tool.poetry.source]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "supplemental"
+[tool.poetry.group.dev.dependencies]
+autopep8 = "^2.3.2"
+flake8 = "^7.2.0"
+black = "^25.1.0"
+pylama = "^8.4.1"
+isort = "^6.0.1"
+pre-commit = "^4.2.0"
