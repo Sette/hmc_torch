@@ -56,8 +56,13 @@ repos:
         language: python
         entry: poetry run autopep8 --in-place --recursive src
         types_or: [python, pyi]
-      # - id: pylama
-      #   name: Pylama Lint
-      #   language: python
-      #   entry: poetry run pylama
-      #   types_or: [python, pyi]
+      - id: pylama
+        name: Pylama Lint
+        language: python
+        entry: poetry run pylama
+        types_or: [python, pyi]
+      - id: pylint
+        name: Pylint Lint
+        language: python
+        entry: poetry run pylint src
+        types_or: [python, pyi]

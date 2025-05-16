@@ -11,6 +11,7 @@ lint-check:
 	black --check src
 	pylama src
 	isort -c src
+	pylint $(git ls-files '*.py')
 
 lint:
 	@echo "--> Running linter"
