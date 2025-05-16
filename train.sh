@@ -10,16 +10,18 @@ datasets=('cellcycle_GO' 'derisi_GO' 'eisen_GO' 'expr_GO' 'gasch1_GO'
 DATASET="seq_FUN"
 DATASET_PATH="/home/bruno/storage/data/datasets"
 BATCH_SIZE=4
-LR=1e-4
-DROPOUT=0.7
-HIDDEN_DIM=2000
-NUM_LAYERS=3
-WEIGHT_DECAY=1e-5
 NON_LIN="relu"
 DEVICE="cuda"
-NUM_EPOCHS=400
+EPOCHS=400
 OUTPUT_PATH="/home/bruno/storage/models/gofun"
 METHOD="local"
+HPO="false"
+HIDDEN_DIMS="128 64 64 64 256 128"
+LR_VALUES="0.00010794368379687011 2.178703230034242e-06 7.460962089501645e-06 1.2134579389248778e-05 7.988004821793316e-05 9.743887160679586e-06"
+DROPOUT_VALUES="0.740386914297677 0.5500644363368916 0.753285175114529 0.4901667669873963 0.4134921804354519 0.4432743726722958"
+NUM_LAYERS_VALUES="3 1 2 2 3 2"
+WEIGHT_DECAY_VALUES="2.2136082418391805e-06 0.005034954154454949 8.445576937834946e-06 0.0001615124248445063 2.765823670906765e-06 2.7622113077056268e-06"
+export PYTHONPATH=src
 
 # Function to display help
 usage() {
@@ -29,16 +31,16 @@ usage() {
     echo "  --dataset <name>          Dataset name (default: $DATASET)"
     echo "  --dataset_path <path>     Dataset path (default: $DATASET_PATH)"
     echo "  --batch_size <num>        Batch size (default: $BATCH_SIZE)"
-    echo "  --lr <value>              Learning rate (default: $LR)"
-    echo "  --dropout <value>         Dropout rate (default: $DROPOUT)"
-    echo "  --hidden_dim <num>        Hidden dimension (default: $HIDDEN_DIM)"
-    echo "  --num_layers <num>        Number of layers (default: $NUM_LAYERS)"
-    echo "  --weight_decay <value>    Weight decay (default: $WEIGHT_DECAY)"
+    echo "  --dropout_values <values> Dropout rates"
+    echo "  --hidden_dims <values>    Hidden dimensions"
+    echo "  --num_layers_values <values> Number of layers"
+    echo "  --weight_decay_values <values> Weight decay"
     echo "  --non_lin <function>      Activation function (default: $NON_LIN)"
     echo "  --device <type>           Device (cuda/cpu) (default: $DEVICE)"
-    echo "  --num_epochs <num>        Number of epochs (default: $NUM_EPOCHS)"
+    echo "  --epochs <num>            Number of epochs (default: $EPOCHS)"
     echo "  --output_path <path>      Output path for models (default: $OUTPUT_PATH)"
     echo "  --method <method>         Training method (default: $METHOD)"
+    echo "  --hpo <true/false>        Hyperparameter optimization (default: $HPO)"
     echo "  --help                    Display this message and exit"
     exit 0
 }
@@ -49,16 +51,17 @@ while [ "$#" -gt 0 ]; do
         --dataset) DATASET="$2"; shift ;;
         --dataset_path) DATASET_PATH="$2"; shift ;;
         --batch_size) BATCH_SIZE="$2"; shift ;;
-        --lr) LR="$2"; shift ;;
-        --dropout) DROPOUT="$2"; shift ;;
-        --hidden_dim) HIDDEN_DIM="$2"; shift ;;
-        --num_layers) NUM_LAYERS="$2"; shift ;;
-        --weight_decay) WEIGHT_DECAY="$2"; shift ;;
+        --lr_values) LR_VALUES=($2); shift ;;
+        --dropout_values) DROPOUT_VALUES=($2); shift ;;
+        --hidden_dims) HIDDEN_DIMS=($2); shift ;;
+        --num_layers_values) NUM_LAYERS_VALUES=($2); shift ;;
+        --weight_decay_values) WEIGHT_DECAY_VALUES=($2); shift ;;
         --non_lin) NON_LIN="$2"; shift ;;
         --device) DEVICE="$2"; shift ;;
-        --num_epochs) NUM_EPOCHS="$2"; shift ;;
+        --epochs) EPOCHS="$2"; shift ;;
         --output_path) OUTPUT_PATH="$2"; shift ;;
         --method) METHOD="$2"; shift ;;
+        --hpo) HPO="$2"; shift ;;
         --help) usage ;;
         *) echo "Invalid option: $1"; usage ;;
     esac
@@ -74,23 +77,25 @@ if [ "$DATASET" = "all" ]; then
         # Loop para executar com diferentes seeds
         for SEED in 0
         do
-            echo "Running with arguments: --datasets $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout $DROPOUT --hidden_dim $HIDDEN_DIM --num_layers $NUM_LAYERS --weight_decay $WEIGHT_DECAY --non_lin $NON_LIN --device $DEVICE --num_epochs $NUM_EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
+            echo "Running with arguments: --dataset $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr_values $LR_VALUES --dropout $DROPOUT_VALUES --hidden_dims $HIDDEN_DIMS --num_layers_values $NUM_LAYERS_VALUES --weight_decay_values $WEIGHT_DECAY_VALUES --non_lin $NON_LIN --device $DEVICE --epochs $EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
             # Controle de processos simultâneos
-            PYTHONPATH=src python -m hmc.train.main \
+            PYTHONPATH=src poetry run python -m hmc.train.main \
                 --datasets "$dataset" \
                 --dataset_path "$DATASET_PATH" \
                 --batch_size "$BATCH_SIZE" \
-                --lr "$LR" \
-                --dropout "$DROPOUT" \
-                --hidden_dim "$HIDDEN_DIM" \
-                --num_layers "$NUM_LAYERS" \
-                --weight_decay "$WEIGHT_DECAY" \
+                --lr_values "${LR_VALUES[@]}" \
+                --dropout_values "${DROPOUT_VALUES[@]}" \
+                --hidden_dims "${HIDDEN_DIMS[@]}" \
+                --num_layers_values "${NUM_LAYERS_VALUES[@]}" \
+                --weight_decay_values "${WEIGHT_DECAY_VALUES[@]}" \
                 --non_lin "$NON_LIN" \
                 --device "$DEVICE" \
-                --num_epochs "$NUM_EPOCHS" \
+                --epochs "$EPOCHS" \
                 --seed "$SEED" \
                 --output_path "$OUTPUT_PATH" \
-                --method "$METHOD" &
+                --method "$METHOD" \
+                --hpo "$HPO" &  # Executa em segundo plano
+
 
             ((current_jobs++))
 
@@ -105,26 +110,33 @@ if [ "$DATASET" = "all" ]; then
 else
     for SEED in 0
         do
-            echo "Running with arguments: --datasets $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout $DROPOUT --hidden_dim $HIDDEN_DIM --num_layers $NUM_LAYERS --weight_decay $WEIGHT_DECAY --non_lin $NON_LIN --device $DEVICE --num_epochs $NUM_EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
+            echo "Running with arguments: --dataset $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout_values $DROPOUT_VALUES --hidden_dims $HIDDEN_DIMS --num_layers_values $NUM_LAYERS_VALUES --weight_decay_values $WEIGHT_DECAY_VALUES --non_lin $NON_LIN --device $DEVICE --epochs $EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
             # Controle de processos simultâneos
-            PYTHONPATH=src python -m hmc.train.main \
-                --datasets "$DATASET" \
-                --dataset_path "$DATASET_PATH" \
-                --batch_size "$BATCH_SIZE" \
-                --lr "$LR" \
-                --dropout "$DROPOUT" \
-                --hidden_dim "$HIDDEN_DIM" \
-                --num_layers "$NUM_LAYERS" \
-                --weight_decay "$WEIGHT_DECAY" \
-                --non_lin "$NON_LIN" \
-                --device "$DEVICE" \
-                --num_epochs "$NUM_EPOCHS" \
-                --seed "$SEED" \
-                --output_path "$OUTPUT_PATH" \
-                --method "$METHOD"
+            cmd="poetry run python -m hmc.train.main \
+                --datasets $DATASET \
+                --dataset_path $DATASET_PATH \
+                --batch_size $BATCH_SIZE \
+                --non_lin $NON_LIN \
+                --device $DEVICE \
+                --epochs $EPOCHS \
+                --seed $SEED \
+                --output_path $OUTPUT_PATH \
+                --method $METHOD \
+                --hpo $HPO"
+            if [ "$HPO" = "false" ]; then
+                cmd+=" --lr_values ${LR_VALUES[@]} \
+                        --dropout_values ${DROPOUT_VALUES[@]} \
+                        --hidden_dims ${HIDDEN_DIMS[@]} \
+                        --num_layers_values ${NUM_LAYERS_VALUES[@]} \
+                        --weight_decay_values ${WEIGHT_DECAY_VALUES[@]}"
+            fi
+
+            $cmd &  # Executa em segundo plano
     done
 fi
+TRAIN_PID=$!
 # Aguarda a execução de todos os processos restantes
+trap "kill $TRAIN_PID" SIGINT SIGTERM
 wait
 
 echo "All experiments completed!"

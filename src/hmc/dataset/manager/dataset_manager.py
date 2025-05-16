@@ -12,7 +12,9 @@ from hmc.dataset.datasets.gofun.dataset_torch import HMCDatasetTorch
 from hmc.utils.dir import __load_json__
 
 # Configurar o logger
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
 # Criar um logger
 logger = logging.getLogger(__name__)
@@ -100,7 +102,11 @@ class HMCDatasetManager:
 
         self.nodes = sorted(
             self.g.nodes(),
-            key=lambda x: ((nx.shortest_path_length(self.g, x, "root"), x) if self.is_go else (len(x.split(".")), x)),
+            key=lambda x: (
+                (nx.shortest_path_length(self.g, x, "root"), x)
+                if self.is_go
+                else (len(x.split(".")), x)
+            ),
         )
         self.nodes_idx = dict(zip(self.nodes, range(len(self.nodes))))
         self.g_t = self.g.reverse()
@@ -164,7 +170,9 @@ class HMCDatasetManager:
                 y_local_ = [np.zeros(self.levels_size.get(key)) for key in sorted_keys]
             for node in labels.split("@"):
                 if self.is_global:
-                    y_[[self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node)]] = 1
+                    y_[
+                        [self.nodes_idx.get(a) for a in nx.ancestors(self.g_t, node)]
+                    ] = 1
                     y_[self.nodes_idx[node]] = 1
 
                 if not self.is_global:
@@ -172,8 +180,12 @@ class HMCDatasetManager:
                     y_local_[depth][self.local_nodes_idx[depth].get(node)] = 1
                     for ancestor in nx.ancestors(self.g_t, node):
                         if ancestor != "root":
-                            depth = nx.shortest_path_length(self.g_t, "root").get(ancestor)
-                            y_local_[depth][self.local_nodes_idx[depth].get(ancestor)] = 1
+                            depth = nx.shortest_path_length(self.g_t, "root").get(
+                                ancestor
+                            )
+                            y_local_[depth][
+                                self.local_nodes_idx[depth].get(ancestor)
+                            ] = 1
 
             if self.is_global:
                 Y.append(y_)

@@ -64,6 +64,8 @@ def binarize_labels(dataset_df, args):
     with open(args.mlb_path, "wb") as file:
         pickle.dump(mlbs, file)
 
-    dataset_df["all_binarized"] = dataset_df.apply(lambda row: [sublist for sublist in row[labels_name]], axis=1)
+    dataset_df["all_binarized"] = dataset_df.apply(
+        lambda row: [sublist for sublist in row[labels_name]], axis=1
+    )
     tracks_df = dataset_df[["track_id", "y_true", "all_binarized"]]
     return tracks_df

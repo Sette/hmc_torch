@@ -128,23 +128,38 @@ class arff_data_to_csv:
                         if f_type == "numeric" or f_type == "NUMERIC":
                             d.append([])
                             cats_lens.append(1)
-                            feature_types.append(lambda x, i: [float(x)] if x != "?" else [np.nan])
+                            feature_types.append(
+                                lambda x, i: [float(x)] if x != "?" else [np.nan]
+                            )
 
                         else:
                             cats = f_type[1:-1].split(",")
                             cats_lens.append(len(cats))
                             cat_dict = dict()
                             for i, key in enumerate(cats):
-                                cat_dict[key] = keras.utils.to_categorical(i, len(cats)).tolist()
+                                cat_dict[key] = keras.utils.to_categorical(
+                                    i, len(cats)
+                                ).tolist()
                             d.append(cat_dict)
-                            feature_types.append(lambda x, i: d[i].get(x, [0.0] * cats_lens[i]))
+                            feature_types.append(
+                                lambda x, i: d[i].get(x, [0.0] * cats_lens[i])
+                            )
                 elif l.startswith("@DATA"):
                     read_data = True
                 elif read_data:
                     d_line = l.split("%")[0].strip().split(",")
                     lab = d_line[len(feature_types)].replace("/", ".").strip()
 
-                    X.append(list(chain(*[feature_types[i](x, i) for i, x in enumerate(d_line[: len(feature_types)])])))
+                    X.append(
+                        list(
+                            chain(
+                                *[
+                                    feature_types[i](x, i)
+                                    for i, x in enumerate(d_line[: len(feature_types)])
+                                ]
+                            )
+                        )
+                    )
 
                     # for t in lab.split('@'):
                     #    y_[[nodes_idx.get(a) for a in nx.ancestors(g_t, t.replace('/', '.'))]] = 1

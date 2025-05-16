@@ -7,12 +7,12 @@ from sklearn.metrics import average_precision_score
 from hmc.model.global_classifier.constrained.utils import get_constr_out
 
 
-class ConstrainedFFNNModel(nn.Module):
+class ConstrainedModel(nn.Module):
     """C-HMCNN(h) model - during training it returns the not-constrained
     output that is then passed to MCLoss"""
 
     def __init__(self, input_dim, hidden_dim, output_dim, hyperparams, R):
-        super(ConstrainedFFNNModel, self).__init__()
+        super(ConstrainedModel, self).__init__()
 
         self.nb_layers = hyperparams["num_layers"]
         self.R = R
@@ -49,7 +49,7 @@ class ConstrainedFFNNModel(nn.Module):
         return constrained_out
 
 
-class ConstrainedFFNNLightningModel(LightningModule):
+class ConstrainedLightningModel(LightningModule):
     def __init__(
         self,
         input_dim,
@@ -61,14 +61,16 @@ class ConstrainedFFNNLightningModel(LightningModule):
         lr,
         weight_decay,
     ):
-        super().__init__()
-        self.model = ConstrainedFFNNModel(input_dim, hidden_dim, output_dim, hyperparams, R)
+        super(ConstrainedLightningModel, self).__init__()
+        self.model = ConstrainedModel(input_dim, hidden_dim, output_dim, hyperparams, R)
         self.model = self.model.to(self.device)
         self.R = R
         self.to_eval = to_eval.to(self.device)
         self.criterion = nn.BCELoss()
         self.lr = lr
         self.weight_decay = weight_decay
+        self.val_outputs = []
+        self.test_outputs = []
 
     def forward(self, x):
         return self.model(x)
@@ -87,6 +89,8 @@ class ConstrainedFFNNLightningModel(LightningModule):
         self.test_outputs = []
 
     def training_step(self, batch, batch_idx):
+        print(f"Training step {batch_idx}")
+        self.model.train()
         x, y = batch
         x, y = x.to(self.device), y.to(self.device)
 
@@ -102,21 +106,25 @@ class ConstrainedFFNNLightningModel(LightningModule):
 
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch):
         x, y = batch
         x = x.to(self.device)
 
         constrained_output = self.model(x.float())
 
-        self.val_outputs.append({"constr_output": constrained_output.cpu(), "y": y.cpu()})
+        self.val_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch):
         x, y = batch
         x, y = x.to(self.device), y.to(self.device)
 
         constrained_output = self.model(x.float())
 
-        self.test_outputs.append({"constr_output": constrained_output.cpu(), "y": y.cpu()})
+        self.test_outputs.append(
+            {"constr_output": constrained_output.cpu(), "y": y.cpu()}
+        )
 
     def on_test_epoch_end(self):
         """Processa os resultados e salva em `lightning_logs`."""
@@ -126,18 +134,22 @@ class ConstrainedFFNNLightningModel(LightningModule):
         constr_test = torch.cat([x["constr_output"] for x in self.test_outputs], dim=0)
         y_test = torch.cat([x["y"] for x in self.test_outputs], dim=0)
 
-        score = average_precision_score(y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro")
+        score = average_precision_score(
+            y_test[:, self.to_eval], constr_test.data[:, self.to_eval], average="micro"
+        )
         self.log("test_score", score, prog_bar=True, logger=True)
 
         # 📁 Obtém o diretório do Lightning Logs
-        log_dir = self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        log_dir = (
+            self.trainer.logger.log_dir if self.trainer.logger else "lightning_logs"
+        )
         results_path = os.path.join(log_dir, "results.csv")
 
         # 🔥 Cria o diretório se não existir
         os.makedirs(log_dir, exist_ok=True)
 
         # Salva os resultados em `lightning_logs/results.csv`
-        with open(results_path, "a") as f:
+        with open(results_path, "a", encoding="utf-8") as f:
             f.write(f"{self.current_epoch},{score}\n")
 
     def on_validation_epoch_end(self):
@@ -155,5 +167,7 @@ class ConstrainedFFNNLightningModel(LightningModule):
         self.log("val_score", score, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
         return optimizer

@@ -6,16 +6,17 @@ install-dependencies:
 
 lint-check:
 	@echo "--> Running linter check"
+	autopep8 --in-place --recursive src
 	flake8 **/*.py
-	black --check .
-	pylama hmc
-	isort -c .
+	black --check src
+	pylama src
+	isort -c src
 
 lint:
 	@echo "--> Running linter"
-	black .
-	flake8 .
-	isort .
+	black src
+	flake8 src
+	isort src
 
 dvc:
 	@dvc pull
