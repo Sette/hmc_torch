@@ -123,11 +123,12 @@ def main():
         "imclef07a": 1000,
         "imclef07d": 1000,
     }
-    args.hidden_dims = {
-        "FUN": hidden_dims_FUN,
-        "GO": hidden_dims_GO,
-        "others": hidden_dims_others,
-    }
+    if not args.hidden_dims:
+        args.hidden_dims = {
+            "FUN": hidden_dims_FUN,
+            "GO": hidden_dims_GO,
+            "others": hidden_dims_others,
+        }
     lrs_FUN = {
         "cellcycle": 1e-4,
         "derisi": 1e-4,

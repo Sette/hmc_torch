@@ -62,6 +62,7 @@ class HMCLocalModel(nn.Module):
         hidden_size=None,
         num_layers=None,
         dropout=None,
+        active_levels=None,
     ):
         super(HMCLocalModel, self).__init__()
         if not input_size:
@@ -81,21 +82,35 @@ class HMCLocalModel(nn.Module):
         self.dropout = dropout
         self.levels = nn.ModuleList()
         self.max_depth = len(levels_size)
+        self.active_levels = active_levels
 
-        for index, level_size in enumerate(levels_size.values()):
-            self.levels.append(
-                BuildClassification(
-                    input_shape=input_size,
-                    hidden_size=hidden_size[index],
-                    output_size=level_size,
-                    nb_layers=num_layers[index],
-                    dropout_rate=dropout[index],
-                )
+        if active_levels is not None:
+            self.model = BuildClassification(
+                input_shape=input_size,
+                hidden_size=hidden_size[active_levels[0]],
+                output_size=levels_size[active_levels[0]],
+                nb_layers=num_layers[active_levels[0]],
+                dropout_rate=dropout[active_levels[0]],
             )
+        else:
+            for index, level_size in enumerate(levels_size.values()):
+                self.levels.append(
+                    BuildClassification(
+                        input_shape=input_size,
+                        hidden_size=hidden_size[index],
+                        output_size=level_size,
+                        nb_layers=num_layers[index],
+                        dropout_rate=dropout[index],
+                    )
+                )
 
     def forward(self, x):
         outputs = []
-        for i, level in enumerate(self.levels):
-            local_output = level(x)
-            outputs.append(local_output)
-        return outputs
+        if self.active_levels is not None:
+            output = self.model(x)
+            return output
+        else:
+            for idx, level in enumerate(self.levels):
+                local_output = level(x)
+                outputs.append(local_output)
+            return outputs
