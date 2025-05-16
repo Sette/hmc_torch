@@ -223,6 +223,7 @@ def train_local(args):
     # Load train, val and test set
     device = torch.device(args.device)
     args.data, args.ontology = args.dataset_name.split("_")
+
     hmc_dataset = initialize_dataset_experiments(
         args.dataset_name,
         device=args.device,
@@ -291,6 +292,7 @@ def train_local(args):
     args.hmc_dataset = hmc_dataset
     args.levels_size = hmc_dataset.levels_size
     args.input_dim = args.input_dims[args.data]
+
     args.max_depth = hmc_dataset.max_depth
     args.to_eval = hmc_dataset.to_eval
 
@@ -300,6 +302,7 @@ def train_local(args):
     if args.hpo == "true":
         logging.info("Hyperparameter optimization")
         args.n_trials = 20
+
         best_params = optimize_hyperparameters_per_level(args=args)
 
         logging.info(best_params)
@@ -322,6 +325,7 @@ def train_local(args):
         params = {
             "levels_size": hmc_dataset.levels_size,
             "input_size": args.input_dims[args.data],
+            "input_size": args.input_dims[data],
             "hidden_size": hidden_dims,
             "num_layers": num_layers_values,
             "dropout": dropout_values,
