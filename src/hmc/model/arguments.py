@@ -27,27 +27,11 @@ def get_parser():
     parser.add_argument(
         "--batch_size", type=int, default=64, help="Batch size for training."
     )
-    parser.add_argument(
-        "--lr", type=float, default=1e-5, help="Learning rate by level."
-    )
+
     parser.add_argument(
         "--epochs", type=int, default=15, help="Number of epochs for training."
     )
-    parser.add_argument("--dropout", type=float, default=0.7, help="Dropout rate.")
 
-    # Model architecture parameters
-    parser.add_argument(
-        "--hidden_dim", type=int, default=50, help="Dimension of hidden layers."
-    )
-    parser.add_argument(
-        "--num_layers", type=int, default=2, help="Number of layers in the model."
-    )
-    parser.add_argument(
-        "--weight_decay",
-        type=float,
-        default=1e-5,
-        help="Weight decay (L2 regularization).",
-    )
     parser.add_argument(
         "--non_lin",
         type=str,
@@ -89,6 +73,47 @@ def get_parser():
         metavar="HPO",
         help="Enable or disable Hyperparameter Optimization (HPO). \
             Use 'true' to enable and 'false' to disable.",
+    )
+
+    # HPO result parameters (used when HPO is disabled)
+    parser.add_argument(
+        "--lr_values",
+        type=float,
+        nargs="+",
+        required=False,
+        help="Lista de valores para o learning rate (HPO).",
+    )
+    parser.add_argument(
+        "--dropout_values",
+        type=float,
+        nargs="+",
+        required=False,
+        metavar="DROPOUT",
+        help="Lista de valores para o dropout (HPO).",
+    )
+    parser.add_argument(
+        "--hidden_dims",
+        type=int,
+        nargs="+",
+        required=False,
+        metavar="HIDDEN_DIMS",
+        help="Lista de valores para o número de neurônios ocultos (HPO).",
+    )
+    parser.add_argument(
+        "--num_layers_values",
+        type=int,
+        nargs="+",
+        required=False,
+        metavar="NUM_LAYERS",
+        help="Lista de valores para o número de camadas (HPO).",
+    )
+    parser.add_argument(
+        "--weight_decay_values",
+        type=float,
+        nargs="+",
+        required=False,
+        metavar="WEIGHT_DECAY",
+        help="Lista de valores para o peso de decréscimo (HPO).",
     )
 
     return parser
