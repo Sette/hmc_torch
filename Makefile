@@ -13,6 +13,10 @@ lint-check:
 	isort -c src
 	pylint $(git ls-files '*.py')
 
+pre-commit:
+	@echo "--> Running pre-commit"
+	pre-commit run --all-files
+
 lint:
 	@echo "--> Running linter"
 	black src

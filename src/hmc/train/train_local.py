@@ -144,8 +144,8 @@ def val(args):
     local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
     logging.info(f"Levels to evaluate: {args.active_levels}")
     for i in args.active_levels:
-        if round(local_val_losses[i].item(), 3) < round(args.best_val_loss[i], 3):
-            args.best_val_loss[i] = round(local_val_losses[i].item(), 3)
+        if round(local_val_losses[i].item()) < args.best_val_loss[i]:
+            args.best_val_loss[i] = local_val_losses[i].item()
             args.patience_counters[i] = 0
             logging.info(f"Level {i}: improved (loss={local_val_losses[i]:.4f})")
         else:
@@ -343,9 +343,10 @@ def train_local(args):
 def optimize_hyperparameters_per_level(args):
     def objective(trial, level):
         hidden_dim = {
-            i: trial.suggest_categorical(f"hidden_dim_level_{i}", [64, 128, 256])
+            i: trial.suggest_int(f"hidden_dim_level_{i}", 64, 512, log=True)
             for i in range(args.max_depth)
         }
+
         # lr = [trial.suggest_float("lr", 1e-4, 1e-2, log=True) for _ in range(args.max_depth)]
         lr_by_level = {
             i: trial.suggest_float(f"lr_level_{i}", 1e-6, 1e-3, log=True)
