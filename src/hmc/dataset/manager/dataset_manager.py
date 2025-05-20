@@ -36,7 +36,7 @@ class HMCDatasetManager:
 
     """
 
-    def __init__(self, dataset, dataset_type="csv", device="cpu", is_global=False):
+    def __init__(self, dataset, dataset_type="arff", device="cpu", is_global=False):
         # Extract dataset paths
         self.test, self.train, self.valid, self.to_eval, self.max_depth = (
             None,
@@ -204,15 +204,15 @@ class HMCDatasetManager:
         self.valid = HMCDatasetCsv(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetCsv(self.test_file, is_go=self.is_go)
 
-        dataset_labels = self.train.df.labels.values
+        dataset_labels = self.train.df.categories.values
         logger.info("Transforming train labels")
         self.train.set_y(self.transform_labels(dataset_labels))
 
-        dataset_labels = self.valid.df.labels.values
+        dataset_labels = self.valid.df.categories.values
         logger.info("Transforming valid labels")
         self.valid.set_y(self.transform_labels(dataset_labels))
 
-        dataset_labels = self.test.df.labels.values
+        dataset_labels = self.test.df.categories.values
         logger.info("Transforming test labels")
         self.test.set_y(self.transform_labels(dataset_labels))
 
