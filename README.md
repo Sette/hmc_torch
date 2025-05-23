@@ -87,6 +87,22 @@ poetry install --no-root
 
 By completing these steps, your environment will be fully prepared to run the HMC Torch project.
 
+#### Dataset Download Using DVC
+
+##### 1. Install DVC with Google Drive Support
+
+```bash
+pip install "dvc[gdrive]"
+```
+
+##### 2. Pull the Dataset
+
+After cloning the repository, run:
+
+```bash
+dvc pull
+```
+
 
 ### 5. Running the Project
 
