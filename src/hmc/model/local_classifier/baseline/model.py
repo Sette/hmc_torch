@@ -72,8 +72,9 @@ class HMCLocalModel(nn.Module):
             print("levels_size is None, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is None")
         if not isinstance(levels_size, dict):
-            print("levels_size is not a dict, error in HMCLocalClassificationModel")
-            raise ValueError("levels_size is not a dict")
+            if active_levels is None:
+                print("levels_size is not a dict, error in HMCLocalClassificationModel")
+                raise ValueError("levels_size is not a dict")
 
         self.input_size = input_size
         self.levels_size = levels_size
@@ -81,7 +82,6 @@ class HMCLocalModel(nn.Module):
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.levels = nn.ModuleList()
-        self.max_depth = len(levels_size)
         self.active_levels = active_levels
 
         if active_levels is not None:

@@ -143,8 +143,8 @@ def val(args):
     local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
     logging.info(f"Levels to evaluate: {args.active_levels}")
     for i in args.active_levels:
-        if round(local_val_losses[i].item()) < args.best_val_loss[i]:
-            args.best_val_loss[i] = local_val_losses[i].item()
+        if round(local_val_losses[i].item(), 4) < args.best_val_loss[i]:
+            args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
             args.patience_counters[i] = 0
             logging.info(f"Level {i}: improved (loss={local_val_losses[i]:.4f})")
         else:
@@ -300,6 +300,12 @@ def train_local(args):
     args.input_dim = args.input_dims[args.data]
     args.max_depth = hmc_dataset.max_depth
     args.to_eval = hmc_dataset.to_eval
+    if args.active_levels is None:
+        args.active_levels = [i for i in range(args.max_depth)]
+        logging.info(f"Active levels: {args.active_levels}")
+    else:
+        args.active_levels = [int(x) for x in args.active_levels]
+        logging.info(f"Active levels: {args.active_levels}")
 
     criterions = [nn.BCELoss() for _ in hmc_dataset.levels_size]
     args.criterions = criterions

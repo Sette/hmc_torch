@@ -20,7 +20,7 @@ METHOD="local"
 SEED=0
 DATASET_TYPE="arff"
 HPO="false"
-
+ACTIVE_LEVELS="0"
 HIDDEN_DIMS="90 237 268 143 211 94"
 LR_VALUES="4.097387271477909e-06 2.9747991658725936e-06 2.120727918791954e-06 3.402120654120122e-06 2.5882639253195798e-06 1.2271042631546119e-06"
 DROPOUT_VALUES="0.4699581407966523 0.3460609373742073 0.34157229615973433 0.3654206518990384 0.3939413835000193 0.30403268307606013"
@@ -52,6 +52,7 @@ usage() {
     echo "  --output_path <path>      Output path for models (default: $OUTPUT_PATH)"
     echo "  --method <method>         Training method (default: $METHOD)"
     echo "  --hpo <true/false>        Hyperparameter optimization (default: $HPO)"
+    echo "  --active_levels <num>     Number of active levels"
     echo "  --help                    Display this message and exit"
     exit 0
 }
@@ -75,6 +76,7 @@ while [ "$#" -gt 0 ]; do
         --output_path) OUTPUT_PATH="$2"; shift ;;
         --method) METHOD="$2"; shift ;;
         --hpo) HPO="$2"; shift ;;
+        --active_levels) ACTIVE_LEVELS=($2); shift ;;
         --help) usage ;;
         *) echo "Invalid option: $1"; usage ;;
     esac
@@ -91,7 +93,12 @@ done
                 --seed $SEED \
                 --output_path $OUTPUT_PATH \
                 --method $METHOD \
-                --hpo $HPO"
+                --hpo $HPO" 
+
+if [ "$ACTIVE_LEVELS" ]; then
+    cmd+=" --active_levels $ACTIVE_LEVELS"
+fi
+
 
 if [ "$HPO" = "false" ] && [ "$METHOD" = "local" ]; then
         cmd+=" \

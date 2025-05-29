@@ -1,18 +1,15 @@
 import json
 import logging
 
-import numpy as np
 import optuna
 import torch
-import torch.nn as nn
-from sklearn import preprocessing
-from sklearn.impute import SimpleImputer
 from sklearn.metrics import average_precision_score
-from torch.utils.data import DataLoader
-
-from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
-from hmc.train.utils import local_to_global_predictions, show_global_loss, show_local_losses
+from hmc.train.utils import (
+    local_to_global_predictions,
+    show_global_loss,
+    show_local_losses,
+    create_job_id_name)
 from hmc.utils.dir import create_dir
 
 
@@ -23,46 +20,52 @@ def save_dict_to_json(dictionary, file_path):
 
 def optimize_hyperparameters_per_level(args):
     def objective(trial, level):
-        hidden_dim = {
-            i: trial.suggest_int(f"hidden_dim_level_{i}", 64, 512, log=True)
-            for i in range(args.max_depth)
-        }
+        # hidden_dim = {
+        #     i: trial.suggest_int(f"hidden_dim_level_{i}", 64, 512, log=True)
+        #     for i in range(args.max_depth)
+        # }
 
-        # lr = [trial.suggest_float("lr", 1e-4, 1e-2, log=True) for _ in range(args.max_depth)]
-        lr_by_level = {
-            i: trial.suggest_float(f"lr_level_{i}", 1e-6, 1e-3, log=True)
-            for i in range(args.max_depth)
-        }
-        dropout = {
-            i: trial.suggest_float(f"dropout_level_{i}", 0.3, 0.8, log=True)
-            for i in range(args.max_depth)
-        }
-        num_layers = {
-            i: trial.suggest_int(f"num_layers_level_{i}", 1, 3, log=True)
-            for i in range(args.max_depth)
-        }
-        weight_decay = {
-            i: trial.suggest_float(f"weight_decay_level_{i}", 1e-6, 1e-2, log=True)
-            for i in range(args.max_depth)
-        }
+        # # lr = [trial.suggest_float("lr", 1e-4, 1e-2, log=True) for _ in range(args.max_depth)]
+        # lr_by_level = {
+        #     i: trial.suggest_float(f"lr_level_{i}", 1e-6, 1e-3, log=True)
+        #     for i in range(args.max_depth)
+        # }
+        # dropout = {
+        #     i: trial.suggest_float(f"dropout_level_{i}", 0.3, 0.8, log=True)
+        #     for i in range(args.max_depth)
+        # }
+        # num_layers = {
+        #     i: trial.suggest_int(f"num_layers_level_{i}", 1, 3, log=True)
+        #     for i in range(args.max_depth)
+        # }
+        # weight_decay = {
+        #     i: trial.suggest_float(f"weight_decay_level_{i}", 1e-6, 1e-2, log=True)
+        #     for i in range(args.max_depth)
+        # }
 
-        args.active_levels = [level]
+        hidden_dim = trial.suggest_int(f"hidden_dim_level_{level}", 64, 512, log=True)
+        lr_by_level = trial.suggest_float(f"lr_level_{level}", 1e-6, 1e-3, log=True)
+        dropout = trial.suggest_float(f"dropout_level_{level}", 0.3, 0.8, log=True)
+        num_layers = trial.suggest_int(f"num_layers_level_{level}", 1, 3, log=True)
+        weight_decay = trial.suggest_float(f"weight_decay_level_{level}", 1e-6, 1e-2, log=True)
+
+        active_levels_train = [level]
 
         params = {
-            "levels_size": args.levels_size,
+            "levels_size": args.levels_size[level],
             "input_size": args.input_dims[args.data],
             "hidden_size": hidden_dim,
             "num_layers": num_layers,
             "dropout": dropout,
-            "active_levels": args.active_levels,
+            "active_levels": active_levels_train,
         }
 
         args.model = HMCLocalModel(**params).to(args.device)
 
         optimizer = torch.optim.Adam(
             args.model.parameters(),
-            lr=lr_by_level[level],
-            weight_decay=weight_decay[level],
+            lr=lr_by_level,
+            weight_decay=weight_decay,
         )
         args.optimizer = optimizer
 
@@ -118,9 +121,9 @@ def optimize_hyperparameters_per_level(args):
             show_local_losses(local_train_losses, set="Train")
             show_global_loss(global_train_loss, set="Train")
 
-        local_val_losses, local_val_precision = val_optimizer(args)
-        logging.info(f"Local loss: {local_val_losses}")
-        logging.info(f"Local precision: {local_val_precision}")
+            local_val_losses, local_val_precision = val_optimizer(args)
+            logging.info(f"Local loss: {local_val_losses}")
+            logging.info(f"Local precision: {local_val_precision}")
 
         return local_val_precision[level]
 
@@ -128,7 +131,8 @@ def optimize_hyperparameters_per_level(args):
 
     create_dir("results/hpo")
 
-    for level in range(len(args.levels_size)):
+    for level in args.active_levels:
+        args.level = level
         logging.info(f"\n🔍 Optimizing hyperparameters for level {level}...\n")
         study = optuna.create_study(direction="minimize")
         study.optimize(lambda trial: objective(trial, level), n_trials=args.n_trials)
@@ -143,9 +147,11 @@ def optimize_hyperparameters_per_level(args):
 
         logging.info(f"✅ Best hyperparameters for level {level}: {study.best_params}")
 
+    job_id = create_job_id_name(prefix="hpo")
+
     save_dict_to_json(
         best_params_per_level,
-        f"results/hpo/best_params_{args.dataset_name}.json",
+        f"results/hpo/best_params_{args.dataset_name}-{job_id}.json",
     )
 
     return best_params_per_level
@@ -153,10 +159,10 @@ def optimize_hyperparameters_per_level(args):
 
 def val_optimizer(args):
     args.model.eval()
-    local_val_losses = [0.0] * args.max_depth
-    output_val = [0.0] * args.max_depth
-    y_val = [0.0] * args.max_depth
-    local_val_precision = [0.0] * args.max_depth
+    local_val_loss = 0.0
+    output_val = 0.0
+    y_val = 0.0
+    local_val_precision = 0.0
 
     with torch.no_grad():
         for i, (inputs, targets, _) in enumerate(args.val_loader):
@@ -166,31 +172,29 @@ def val_optimizer(args):
                 ]
             output = args.model(inputs.float())
 
-            for index in args.active_levels:
-                target = targets[index].float()
-                loss = args.criterions[index](output, target)
-                local_val_losses[index] += loss
+            target = targets[args.level].float()
+            local_val_loss += args.criterions[args.level](output, target)
 
-                if i == 0:
-                    output_val[index] = output.to("cpu")
-                    y_val[index] = target.to("cpu")
-                else:
-                    output_val[index] = torch.cat(
-                        (output_val[index], output.to("cpu")), dim=0
-                    )
-                    y_val[index] = torch.cat((y_val[index], target.to("cpu")), dim=0)
-    for idx in args.active_levels:
-        local_val_precision[idx] = average_precision_score(
-            y_val[idx], output_val[idx], average="micro"
-        )
+            if i == 0:
+                output_val = output.to("cpu")
+                y_val = target.to("cpu")
+            else:
+                output_val = torch.cat(
+                    (output_val, output.to("cpu")), dim=0
+                )
+                y_val = torch.cat((y_val, target.to("cpu")), dim=0)
 
-    local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
+    local_val_precision = average_precision_score(
+        y_val, output_val, average="micro"
+    )
+
+    local_val_loss = local_val_loss / len(args.val_loader)
     logging.info(f"Levels to evaluate: {args.active_levels}")
     for i in args.active_levels:
-        if round(local_val_losses[i].item(), 3) < round(args.best_val_loss[i], 3):
-            args.best_val_loss[i] = round(local_val_losses[i].item(), 3)
+        if round(local_val_loss.item(), 3) < round(args.best_val_loss[i], 3):
+            args.best_val_loss[i] = round(local_val_loss.item(), 3)
             args.patience_counters[i] = 0
-            logging.info(f"Level {i}: improved (loss={local_val_losses[i]:.4f})")
+            logging.info(f"Level {i}: improved (loss={local_val_loss:.4f})")
         else:
             args.patience_counters[i] += 1
             logging.info(
@@ -205,4 +209,4 @@ def val_optimizer(args):
                 # ❄️ Congelar os parâmetros desse nível
                 for param in args.model.levels[i].parameters():
                     param.requires_grad = False
-    return local_val_losses, local_val_precision
+    return local_val_loss, local_val_precision

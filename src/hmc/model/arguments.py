@@ -86,6 +86,15 @@ def get_parser():
             Use 'true' to enable and 'false' to disable.",
     )
 
+    parser.add_argument(
+        "--active_levels",
+        type=int,
+        nargs="+",
+        default=None,
+        required=False,
+        metavar="ACTIVE_LEVELS",
+    )
+
     # HPO result parameters (used when HPO is disabled)
     parser.add_argument(
         "--lr_values",
