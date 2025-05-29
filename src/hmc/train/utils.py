@@ -54,3 +54,36 @@ def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
                 print(f"[WARN] Node '{key}' não encontrado em nodes_idx")
 
     return global_preds
+
+
+def show_local_losses(local_losses, set="Train"):
+    formated_string = ""
+    for level, local_loss in enumerate(local_losses):
+        if local_loss is not None and local_loss != 0.0:
+            if level == 0:
+                formated_string += f"{set} Loss {local_loss:.4f} for level {level} // "
+            else:
+                formated_string += f" + {set} Loss {local_loss:.4f} for level {level} // "
+
+    print(formated_string)
+
+
+def show_global_loss(global_loss, set="Train"):
+    print(f"Global average loss {set} Loss: {global_loss:.4f}")
+
+
+def show_local_precision(local_precisions, set="Train"):
+    formated_string = ""
+    for level, local_precision in enumerate(local_precisions):
+        if local_precision is not None and local_precision != 0.0:
+            if level == 0:
+                formated_string += f"{set} Precision {local_precision:.4f} for level {level} // "
+            else:
+                formated_string += f" + {set} Precision {local_precision:.4f} for level {level} // "
+
+    print(formated_string)
+
+
+def save_dict_to_json(dictionary, file_path):
+    with open(file_path, "w", encoding="utf-8") as json_file:
+        json.dump(dictionary, json_file, ensure_ascii=False, indent=4)

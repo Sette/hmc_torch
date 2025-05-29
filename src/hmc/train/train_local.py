@@ -12,8 +12,7 @@ from torch.utils.data import DataLoader
 
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
-from hmc.model.losses import show_global_loss, show_local_losses
-from hmc.train.utils import local_to_global_predictions
+from hmc.train.utils import local_to_global_predictions, show_global_loss, show_local_losses
 from hmc.utils.dir import create_dir
 
 
@@ -63,10 +62,10 @@ def run(args):
             break
 
         for inputs, targets, _ in args.train_loader:
-            if torch.cuda.is_available():
-                inputs, targets = inputs.to("cuda"), [
-                    target.to("cuda") for target in targets
-                ]
+
+            inputs, targets = inputs.to(args.device), [
+                target.to(args.device) for target in targets
+            ]
             outputs = args.model(inputs.float())
 
             # Zerar os gradientes antes de cada batch
@@ -116,10 +115,9 @@ def val(args):
 
     with torch.no_grad():
         for i, (inputs, targets, _) in enumerate(args.val_loader):
-            if torch.cuda.is_available():
-                inputs, targets = inputs.to("cuda"), [
-                    target.to("cuda") for target in targets
-                ]
+            inputs, targets = inputs.to(args.device), [
+                target.to(args.device) for target in targets
+            ]
             outputs = args.model(inputs.float())
 
             for index in args.active_levels:
@@ -175,10 +173,10 @@ def test(args):
     Y_true_global = []
     with torch.no_grad():
         for inputs, targets, global_targets in args.test_loader:
-            if torch.cuda.is_available():
-                inputs = inputs.to("cuda")
-                targets = [target.to("cuda").float() for target in targets]
-                global_targets = global_targets.to("cpu")
+
+            inputs = inputs.to(args.device)
+            targets = [target.to(args.device).float() for target in targets]
+            global_targets = global_targets.to("cpu")
             outputs = args.model(inputs.float())
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
@@ -223,7 +221,13 @@ def train_local(args):
     logging.info(".......................................")
     logging.info("Experiment with {} dataset ".format(args.dataset_name))
     # Load train, val and test set
-    device = torch.device(args.device)
+
+    if args.device.startswith("cuda") and not torch.cuda.is_available():
+        print("CUDA não está disponível. Usando CPU.")
+        args.device = torch.device("cpu")
+    else:
+        args.device = torch.device(args.device)
+
     args.data, args.ontology = args.dataset_name.split("_")
     hmc_dataset = initialize_dataset_experiments(
         args.dataset_name,
@@ -243,24 +247,24 @@ def train_local(args):
         torch.tensor(scaler.transform(imp_mean.transform(data_valid.X)))
         .clone()
         .detach()
-        .to(device)
+        .to(args.device)
     )
     data_train.X = (
         torch.tensor(scaler.transform(imp_mean.transform(data_train.X)))
         .clone()
         .detach()
-        .to(device)
+        .to(args.device)
     )
     data_test.X = (
         torch.as_tensor(scaler.transform(imp_mean.transform(data_test.X)))
         .clone()
         .detach()
-        .to(device)
+        .to(args.device)
     )
 
-    data_test.Y = torch.as_tensor(data_test.Y).clone().detach().to(device)
-    data_valid.Y = torch.tensor(data_valid.Y).clone().detach().to(device)
-    data_train.Y = torch.tensor(data_train.Y).clone().detach().to(device)
+    data_test.Y = torch.as_tensor(data_test.Y).clone().detach().to(args.device)
+    data_valid.Y = torch.tensor(data_valid.Y).clone().detach().to(args.device)
+    data_train.Y = torch.tensor(data_train.Y).clone().detach().to(args.device)
 
     # Create loaders using local (per-level) y labels
     train_dataset = [

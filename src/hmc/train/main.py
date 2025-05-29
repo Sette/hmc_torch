@@ -197,7 +197,10 @@ def main():
             train_global(dataset_name, args)
 
         if args.method == "local":
-            train_local(args)
+            if args.hpo == "true":
+                train_local_hpo(args)
+            else:
+                train_local(args)
 
         if args.method == "globalLM":
             train_globalLM(dataset_name, args)

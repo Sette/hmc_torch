@@ -2,18 +2,6 @@ import torch
 import torch.nn as nn
 
 
-def show_local_losses(local_losses, set="Train"):
-    formated_string = ""
-    for level, local_loss in enumerate(local_losses):
-        formated_string += f"{set} Loss {local_loss:.4f} for level {level} // "
-
-    print(formated_string)
-
-
-def show_global_loss(global_loss, set="Train"):
-    print(f"Global average loss {set} Loss: {global_loss:.4f}")
-
-
 class MaskedBCELoss(nn.Module):
     def __init__(self):
         super(MaskedBCELoss, self).__init__()

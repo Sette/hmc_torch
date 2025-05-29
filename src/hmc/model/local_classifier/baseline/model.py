@@ -87,12 +87,13 @@ class HMCLocalModel(nn.Module):
         if active_levels is not None:
             self.model = BuildClassification(
                 input_shape=input_size,
-                hidden_size=hidden_size[active_levels[0]],
-                output_size=levels_size[active_levels[0]],
-                nb_layers=num_layers[active_levels[0]],
-                dropout_rate=dropout[active_levels[0]],
+                hidden_size=hidden_size,
+                output_size=levels_size,
+                nb_layers=num_layers,
+                dropout_rate=dropout,
             )
         else:
+            self.max_depth = len(levels_size)
             for index, level_size in enumerate(levels_size.values()):
                 self.levels.append(
                     BuildClassification(

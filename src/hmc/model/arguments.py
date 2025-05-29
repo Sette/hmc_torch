@@ -92,7 +92,7 @@ def get_parser():
         type=float,
         nargs="+",
         required=False,
-        help="Lista de valores para o learning rate (HPO).",
+        help="List of values for the learning rate (used when HPO is disabled).",
     )
     parser.add_argument(
         "--dropout_values",
@@ -100,7 +100,7 @@ def get_parser():
         nargs="+",
         required=False,
         metavar="DROPOUT",
-        help="Lista de valores para o dropout (HPO).",
+        help="List of values for dropout (used when HPO is disabled).",
     )
     parser.add_argument(
         "--hidden_dims",
@@ -108,7 +108,7 @@ def get_parser():
         nargs="+",
         required=False,
         metavar="HIDDEN_DIMS",
-        help="Lista de valores para o número de neurônios ocultos (HPO).",
+        help="List of values for the number of hidden neurons (used when HPO is disabled).",
     )
     parser.add_argument(
         "--num_layers_values",
@@ -116,7 +116,7 @@ def get_parser():
         nargs="+",
         required=False,
         metavar="NUM_LAYERS",
-        help="Lista de valores para o número de camadas (HPO).",
+        help="List of values for the number of layers (used when HPO is disabled).",
     )
     parser.add_argument(
         "--weight_decay_values",
@@ -124,7 +124,7 @@ def get_parser():
         nargs="+",
         required=False,
         metavar="WEIGHT_DECAY",
-        help="Lista de valores para o peso de decréscimo (HPO).",
+        help="List of values for weight decay (used when HPO is disabled).",
     )
 
     return parser
