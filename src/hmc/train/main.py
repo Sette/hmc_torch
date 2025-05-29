@@ -7,10 +7,10 @@ import numpy as np
 import torch
 
 from hmc.model.arguments import get_parser
-from hmc.train.train_global import train_global
-from hmc.train.train_global_baseline import train_global_baseline
-from hmc.train.train_globalLM import train_globalLM
-from hmc.train.train_local import train_local
+from hmc.train.global_classifier.train_global import train_global
+from hmc.train.local_classifier.train_local import train_local
+from hmc.train.global_classifier.train_global_baseline import train_global_baseline
+from hmc.train.global_classifier.train_globalLM import train_globalLM
 from hmc.utils.dir import create_job_id
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
@@ -197,10 +197,7 @@ def main():
             train_global(dataset_name, args)
 
         if args.method == "local":
-            if args.hpo == "true":
-                train_local_hpo(args)
-            else:
-                train_local(args)
+            train_local(args)
 
         if args.method == "globalLM":
             train_globalLM(dataset_name, args)
