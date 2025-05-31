@@ -2,6 +2,7 @@ import json
 import logging
 
 import optuna
+from optuna.pruners import PatientPruner, MedianPruner
 import torch
 from sklearn.metrics import average_precision_score
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
@@ -18,31 +19,35 @@ def save_dict_to_json(dictionary, file_path):
         json.dump(dictionary, json_file, ensure_ascii=False, indent=4)
 
 
+OPTUNA_EARLY_STOPING = 10
+
+
+class EarlyStoppingExceeded(optuna.exceptions.OptunaError):
+    early_stop = OPTUNA_EARLY_STOPING
+    early_stop_count = 0
+    best_score = None
+
+
+def early_stopping_opt(study, trial):
+    if EarlyStoppingExceeded.best_score == None:
+        EarlyStoppingExceeded.best_score = study.best_value
+
+    if study.best_value < EarlyStoppingExceeded.best_score:
+        EarlyStoppingExceeded.best_score = study.best_value
+        EarlyStoppingExceeded.early_stop_count = 0
+    else:
+        if EarlyStoppingExceeded.early_stop_count > EarlyStoppingExceeded.early_stop:
+            EarlyStoppingExceeded.early_stop_count = 0
+            best_score = None
+            raise EarlyStoppingExceeded()
+        else:
+            EarlyStoppingExceeded.early_stop_count = EarlyStoppingExceeded.early_stop_count+1
+    # print(f'EarlyStop counter: {EarlyStoppingExceeded.early_stop_count}, Best score: {study.best_value} and {EarlyStoppingExceeded.best_score}')
+    return
+
+
 def optimize_hyperparameters_per_level(args):
     def objective(trial, level):
-        # hidden_dim = {
-        #     i: trial.suggest_int(f"hidden_dim_level_{i}", 64, 512, log=True)
-        #     for i in range(args.max_depth)
-        # }
-
-        # # lr = [trial.suggest_float("lr", 1e-4, 1e-2, log=True) for _ in range(args.max_depth)]
-        # lr_by_level = {
-        #     i: trial.suggest_float(f"lr_level_{i}", 1e-6, 1e-3, log=True)
-        #     for i in range(args.max_depth)
-        # }
-        # dropout = {
-        #     i: trial.suggest_float(f"dropout_level_{i}", 0.3, 0.8, log=True)
-        #     for i in range(args.max_depth)
-        # }
-        # num_layers = {
-        #     i: trial.suggest_int(f"num_layers_level_{i}", 1, 3, log=True)
-        #     for i in range(args.max_depth)
-        # }
-        # weight_decay = {
-        #     i: trial.suggest_float(f"weight_decay_level_{i}", 1e-6, 1e-2, log=True)
-        #     for i in range(args.max_depth)
-        # }
-
         hidden_dim = trial.suggest_int(f"hidden_dim_level_{level}", 64, 512, log=True)
         lr_by_level = trial.suggest_float(f"lr_level_{level}", 1e-6, 1e-3, log=True)
         dropout = trial.suggest_float(f"dropout_level_{level}", 0.3, 0.8, log=True)
@@ -81,6 +86,8 @@ def optimize_hyperparameters_per_level(args):
         args.level_active[level] = True
 
         args.best_val_loss = [float("inf")] * args.max_depth
+        args.best_val_precision = [0.0] * args.max_depth
+
         logging.info(f"Best val loss created {args.best_val_loss}")
 
         args.epochs_to_eval = 10
@@ -122,10 +129,16 @@ def optimize_hyperparameters_per_level(args):
             show_global_loss(global_train_loss, set="Train")
 
             local_val_losses, local_val_precision = val_optimizer(args)
+            # Reporta o valor de validação para Optuna
+            trial.report(local_val_losses, step=epoch)
+
+            # Early stopping (pruning)
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
             logging.info(f"Local loss: {local_val_losses}")
             logging.info(f"Local precision: {local_val_precision}")
 
-        return local_val_precision[level]
+        return local_val_losses
 
     best_params_per_level = {}
 
@@ -134,8 +147,12 @@ def optimize_hyperparameters_per_level(args):
     for level in args.active_levels:
         args.level = level
         logging.info(f"\n🔍 Optimizing hyperparameters for level {level}...\n")
-        study = optuna.create_study(direction="minimize")
-        study.optimize(lambda trial: objective(trial, level), n_trials=args.n_trials)
+        study = optuna.create_study()
+        try:
+            study.optimize(lambda trial: objective(trial, level),
+                           n_trials=args.n_trials, callbacks=[early_stopping_opt])
+        except EarlyStoppingExceeded:
+            print(f'EarlyStopping Exceeded: No new best scores on iters {OPTUNA_EARLY_STOPING}')
         level_parameters = {
             "hidden_dim": study.best_params[f"hidden_dim_level_{level}"],
             "lr": study.best_params[f"lr_level_{level}"],
@@ -143,6 +160,7 @@ def optimize_hyperparameters_per_level(args):
             "num_layers": study.best_params[f"num_layers_level_{level}"],
             "weight_decay": study.best_params[f"weight_decay_level_{level}"],
         }
+
         best_params_per_level[level] = level_parameters
 
         logging.info(f"✅ Best hyperparameters for level {level}: {study.best_params}")
@@ -190,23 +208,5 @@ def val_optimizer(args):
 
     local_val_loss = local_val_loss / len(args.val_loader)
     logging.info(f"Levels to evaluate: {args.active_levels}")
-    for i in args.active_levels:
-        if round(local_val_loss.item(), 3) < round(args.best_val_loss[i], 3):
-            args.best_val_loss[i] = round(local_val_loss.item(), 3)
-            args.patience_counters[i] = 0
-            logging.info(f"Level {i}: improved (loss={local_val_loss:.4f})")
-        else:
-            args.patience_counters[i] += 1
-            logging.info(
-                f"Level {i}: no improvement \
-                (patience {args.patience_counters[i]}/{args.early_stopping_patience})"
-            )
-            if args.patience_counters[i] >= args.early_stopping_patience:
-                args.level_active[i] = False
-                logging.info(
-                    f"🚫 Early stopping triggered for level {i} — freezing its parameters"
-                )
-                # ❄️ Congelar os parâmetros desse nível
-                for param in args.model.levels[i].parameters():
-                    param.requires_grad = False
+
     return local_val_loss, local_val_precision

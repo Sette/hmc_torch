@@ -142,7 +142,6 @@ def train_global(dataset_name, args):
 
     for epoch in range(num_epochs):
         model.train()
-
         for i, (x, labels) in tqdm(enumerate(train_loader)):
             x = x.to(device)
             labels = labels.to(device)
