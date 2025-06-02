@@ -21,25 +21,36 @@ def get_parser():
     )
 
     parser.add_argument(
-        "--output_path", type=str, required=True, help="Path to save the models."
+        "--output_path",
+        type=str,
+        required=True,
+        help="Path to save the models.",
     )
 
     # Training parameters
     parser.add_argument(
-        "--batch_size", type=int, default=64, help="Batch size for training."
+        "--batch_size",
+        type=int,
+        default=64,
+        required=False,
+        help="Batch size for training.",
     )
 
     parser.add_argument(
-        "--epochs", type=int, default=15, help="Number of epochs for training."
+        "--epochs",
+        type=int,
+        default=15,
+        required=False,
+        help="Number of epochs for training.",
     )
 
     parser.add_argument(
         "--dataset_type",
         type=str,
         choices=["csv", "torch", "arff"],
-        required=False,
         default="arff",
         metavar="DATASET_TYPE",
+        required=False,
         help="Type of dataset to load.",
     )
 
@@ -48,6 +59,8 @@ def get_parser():
         type=str,
         default="relu",
         choices=["relu", "tanh", "sigmoid"],
+        metavar="NON_LIN",
+        required=False,
         help="Non-linearity function.",
     )
 
@@ -56,13 +69,24 @@ def get_parser():
         "--device",
         type=str,
         default="cpu",
+        choices=["cpu", "cuda"],
+        metavar="DEVICE",
+        required=False,
         help='Device to use (e.g., "cpu" or "cuda").',
     )
     parser.add_argument(
-        "--num_epochs", type=int, default=2000, help="Total number of training epochs."
+        "--num_epochs",
+        type=int,
+        default=2000,
+        metavar="NUM_EPOCHS",
+        required=False,
+        help="Total number of training epochs.",
     )
     parser.add_argument(
-        "--seed", type=int, default=0, help="Random seed for reproducibility."
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for reproducibility.",
     )
 
     # Method parameters
@@ -72,6 +96,7 @@ def get_parser():
         default="global",
         choices=["global", "local", "globalLM", "global_baseline"],
         metavar="METHOD",
+        required=False,
         help="Method type to use.",
     )
 
@@ -82,6 +107,7 @@ def get_parser():
         default="false",
         choices=["true", "false"],
         metavar="HPO",
+        required=False,
         help="Enable or disable Hyperparameter Optimization (HPO). \
             Use 'true' to enable and 'false' to disable.",
     )
