@@ -171,3 +171,4 @@ cython_debug/
 data/
 .python-version
 /data
+gene-ontology-original.zip
