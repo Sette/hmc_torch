@@ -82,27 +82,42 @@ These steps will ensure that the project is ready for GPU-based execution.
 Once the virtual environment is activated and Poetry is installed, run the following command to install all project dependencies:
 
 ```bash
-poetry install --no-root
+poetry install --no-root --with dev
 ```
 
 By completing these steps, your environment will be fully prepared to run the HMC Torch project.
 
-#### Dataset Download Using DVC
+### 5. Download dataset Using Kaggle (Optional)
 
-##### 1. Install DVC with Google Drive Support
-
+##### 1. Download dataset via Kaggle CLI
 ```bash
-pip install "dvc[gdrive]"
+pip install kaggle
 ```
 
-##### 2. Pull the Dataset
-
-After cloning the repository, run:
-
 ```bash
-dvc pull
+kaggle datasets download brunosette/gene-ontology-original
 ```
 
+
+##### 2. Download dataset via curl
+```bash
+# Export your Kaggle username and API key
+# export KAGGLE_USERNAME=<YOUR USERNAME>
+# export KAGGLE_KEY=<YOUR KAGGLE KEY>
+
+curl -L -u $KAGGLE_USERNAME:$KAGGLE_KEY\
+  -o ~/Downloads/gene-ontology-original.zip\
+  https://www.kaggle.com/api/v1/datasets/download/brunosette/gene-ontology-original
+
+```
+
+```bash
+mkdir data
+```
+
+```bash
+unzip gene-ontology-original.zip -d data/
+```
 
 ### 5. Running the Project
 
