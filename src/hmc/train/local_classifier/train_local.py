@@ -13,7 +13,12 @@ from torch.utils.data import DataLoader
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
 from hmc.train.local_classifier.hpo.hpo_local import optimize_hyperparameters_per_level
-from hmc.train.utils import local_to_global_predictions, show_global_loss, show_local_losses
+from hmc.train.utils import (
+    local_to_global_predictions,
+    show_local_precision,
+    show_global_loss,
+    show_local_losses,
+)
 from hmc.utils.dir import create_dir
 
 
@@ -23,9 +28,8 @@ def save_dict_to_json(dictionary, file_path):
 
 
 def run(args):
-    if torch.cuda.is_available():
-        args.model = args.model.to(args.device)
-        args.criterions = [criterion.to(args.device) for criterion in args.criterions]
+    args.model = args.model.to(args.device)
+    args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
     args.early_stopping_patience = 3
     args.patience_counters = [0] * args.hmc_dataset.max_depth
@@ -55,7 +59,7 @@ def run(args):
     for epoch in range(1, args.epochs + 1):
         args.model.train()
         local_train_losses = [0.0 for _ in range(args.hmc_dataset.max_depth)]
-        args.active_levels = [i for i, active in enumerate(args.level_active) if active]
+        # args.active_levels = [i for i, active in enumerate(args.level_active) if active]
         logging.info(f"Active levels: {args.active_levels}")
 
         if not args.active_levels:
@@ -102,8 +106,8 @@ def run(args):
         show_global_loss(global_train_loss, set="Train")
 
         local_val_losses, local_val_precision = val(args)
-        logging.info(f"Local loss: {local_val_losses}")
-        logging.info(f"Local precision: {local_val_precision}")
+        show_local_losses(local_val_losses, set="Val")
+        show_local_precision(local_val_precision, set="Val")
     return None
 
 

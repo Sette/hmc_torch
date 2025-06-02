@@ -10,7 +10,8 @@ from hmc.train.utils import (
     local_to_global_predictions,
     show_global_loss,
     show_local_losses,
-    create_job_id_name)
+    create_job_id_name,
+)
 from hmc.utils.dir import create_dir
 
 
@@ -41,7 +42,9 @@ def early_stopping_opt(study, trial):
             best_score = None
             raise EarlyStoppingExceeded()
         else:
-            EarlyStoppingExceeded.early_stop_count = EarlyStoppingExceeded.early_stop_count+1
+            EarlyStoppingExceeded.early_stop_count = (
+                EarlyStoppingExceeded.early_stop_count + 1
+            )
     # print(f'EarlyStop counter: {EarlyStoppingExceeded.early_stop_count}, Best score: {study.best_value} and {EarlyStoppingExceeded.best_score}')
     return
 
@@ -52,7 +55,9 @@ def optimize_hyperparameters_per_level(args):
         lr_by_level = trial.suggest_float(f"lr_level_{level}", 1e-6, 1e-3, log=True)
         dropout = trial.suggest_float(f"dropout_level_{level}", 0.3, 0.8, log=True)
         num_layers = trial.suggest_int(f"num_layers_level_{level}", 1, 3, log=True)
-        weight_decay = trial.suggest_float(f"weight_decay_level_{level}", 1e-6, 1e-2, log=True)
+        weight_decay = trial.suggest_float(
+            f"weight_decay_level_{level}", 1e-6, 1e-2, log=True
+        )
 
         active_levels_train = [level]
 
@@ -74,11 +79,8 @@ def optimize_hyperparameters_per_level(args):
         )
         args.optimizer = optimizer
 
-        if torch.cuda.is_available():
-            args.model = args.model.to(args.device)
-            args.criterions = [
-                criterion.to(args.device) for criterion in args.criterions
-            ]
+        args.model = args.model.to(args.device)
+        args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
         args.early_stopping_patience = 3
         args.patience_counters = [0] * args.hmc_dataset.max_depth
@@ -97,10 +99,10 @@ def optimize_hyperparameters_per_level(args):
             args.model.train()
             local_train_losses = [0.0 for _ in range(args.hmc_dataset.max_depth)]
             for inputs, targets, _ in args.train_loader:
-                if torch.cuda.is_available():
-                    inputs, targets = inputs.to("cuda"), [
-                        target.to("cuda") for target in targets
-                    ]
+
+                inputs, targets = inputs.to(args.device), [
+                    target.to(args.device) for target in targets
+                ]
                 output = args.model(inputs.float())
 
                 # Zerar os gradientes antes de cada batch
@@ -149,10 +151,15 @@ def optimize_hyperparameters_per_level(args):
         logging.info(f"\n🔍 Optimizing hyperparameters for level {level}...\n")
         study = optuna.create_study()
         try:
-            study.optimize(lambda trial: objective(trial, level),
-                           n_trials=args.n_trials, callbacks=[early_stopping_opt])
+            study.optimize(
+                lambda trial: objective(trial, level),
+                n_trials=args.n_trials,
+                callbacks=[early_stopping_opt],
+            )
         except EarlyStoppingExceeded:
-            print(f'EarlyStopping Exceeded: No new best scores on iters {OPTUNA_EARLY_STOPING}')
+            print(
+                f"EarlyStopping Exceeded: No new best scores on iters {OPTUNA_EARLY_STOPING}"
+            )
         level_parameters = {
             "hidden_dim": study.best_params[f"hidden_dim_level_{level}"],
             "lr": study.best_params[f"lr_level_{level}"],
@@ -185,8 +192,8 @@ def val_optimizer(args):
     with torch.no_grad():
         for i, (inputs, targets, _) in enumerate(args.val_loader):
             if torch.cuda.is_available():
-                inputs, targets = inputs.to("cuda"), [
-                    target.to("cuda") for target in targets
+                inputs, targets = inputs.to(args.device), [
+                    target.to(args.device) for target in targets
                 ]
             output = args.model(inputs.float())
 
@@ -197,14 +204,10 @@ def val_optimizer(args):
                 output_val = output.to("cpu")
                 y_val = target.to("cpu")
             else:
-                output_val = torch.cat(
-                    (output_val, output.to("cpu")), dim=0
-                )
+                output_val = torch.cat((output_val, output.to("cpu")), dim=0)
                 y_val = torch.cat((y_val, target.to("cpu")), dim=0)
 
-    local_val_precision = average_precision_score(
-        y_val, output_val, average="micro"
-    )
+    local_val_precision = average_precision_score(y_val, output_val, average="micro")
 
     local_val_loss = local_val_loss / len(args.val_loader)
     logging.info(f"Levels to evaluate: {args.active_levels}")
