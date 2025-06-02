@@ -2,15 +2,14 @@ import json
 import logging
 
 import optuna
-from optuna.pruners import PatientPruner, MedianPruner
 import torch
 from sklearn.metrics import average_precision_score
+
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
 from hmc.train.utils import (
-    local_to_global_predictions,
+    create_job_id_name,
     show_global_loss,
     show_local_losses,
-    create_job_id_name,
 )
 from hmc.utils.dir import create_dir
 
@@ -30,7 +29,7 @@ class EarlyStoppingExceeded(optuna.exceptions.OptunaError):
 
 
 def early_stopping_opt(study, trial):
-    if EarlyStoppingExceeded.best_score == None:
+    if EarlyStoppingExceeded.best_score is None:
         EarlyStoppingExceeded.best_score = study.best_value
 
     if study.best_value < EarlyStoppingExceeded.best_score:
@@ -39,13 +38,15 @@ def early_stopping_opt(study, trial):
     else:
         if EarlyStoppingExceeded.early_stop_count > EarlyStoppingExceeded.early_stop:
             EarlyStoppingExceeded.early_stop_count = 0
-            best_score = None
             raise EarlyStoppingExceeded()
         else:
             EarlyStoppingExceeded.early_stop_count = (
                 EarlyStoppingExceeded.early_stop_count + 1
             )
-    # print(f'EarlyStop counter: {EarlyStoppingExceeded.early_stop_count}, Best score: {study.best_value} and {EarlyStoppingExceeded.best_score}')
+    logging.info(
+        f"EarlyStop counter: {EarlyStoppingExceeded.early_stop_count}, \
+        Best score: {study.best_value} and {EarlyStoppingExceeded.best_score}"
+    )
     return
 
 

@@ -2,7 +2,6 @@ import json
 import logging
 
 import numpy as np
-import optuna
 import torch
 import torch.nn as nn
 from sklearn import preprocessing
@@ -15,11 +14,10 @@ from hmc.model.local_classifier.baseline.model import HMCLocalModel
 from hmc.train.local_classifier.hpo.hpo_local import optimize_hyperparameters_per_level
 from hmc.train.utils import (
     local_to_global_predictions,
-    show_local_precision,
     show_global_loss,
     show_local_losses,
+    show_local_precision,
 )
-from hmc.utils.dir import create_dir
 
 
 def save_dict_to_json(dictionary, file_path):
@@ -159,6 +157,7 @@ def val(args):
             )
             if args.patience_counters[i] >= args.early_stopping_patience:
                 args.level_active[i] = False
+                args.active_levels.remove(i)
                 logging.info(
                     f"🚫 Early stopping triggered for level {i} — freezing its parameters"
                 )

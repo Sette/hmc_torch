@@ -1,7 +1,7 @@
-import numpy as np
 import json
-
 from datetime import datetime
+
+import numpy as np
 
 
 def create_job_id_name(prefix="job"):
@@ -81,7 +81,9 @@ def show_local_losses(local_losses, set="Train"):
             if level == 0:
                 formated_string += f"{set} Loss {local_loss:.4f} for level {level} // "
             else:
-                formated_string += f" + {set} Loss {local_loss:.4f} for level {level} // "
+                formated_string += (
+                    f" + {set} Loss {local_loss:.4f} for level {level} // "
+                )
 
     print(formated_string)
 
@@ -95,9 +97,13 @@ def show_local_precision(local_precisions, set="Train"):
     for level, local_precision in enumerate(local_precisions):
         if local_precision is not None and local_precision != 0.0:
             if level == 0:
-                formated_string += f"{set} Precision {local_precision:.4f} for level {level} // "
+                formated_string += (
+                    f"{set} Precision {local_precision:.4f} for level {level} // "
+                )
             else:
-                formated_string += f" + {set} Precision {local_precision:.4f} for level {level} // "
+                formated_string += (
+                    f" + {set} Precision {local_precision:.4f} for level {level} // "
+                )
 
     print(formated_string)
 
