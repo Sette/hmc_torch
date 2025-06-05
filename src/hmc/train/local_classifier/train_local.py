@@ -17,7 +17,9 @@ from hmc.train.utils import (
     show_global_loss,
     show_local_losses,
     show_local_precision,
+    create_job_id_name,
 )
+from hmc.utils.dir import create_dir
 
 
 def save_dict_to_json(dictionary, file_path):
@@ -171,9 +173,9 @@ def test(args):
     args.model.eval()
     local_inputs = [[] for _ in range(args.hmc_dataset.max_depth)]
     local_outputs = [[] for _ in range(args.hmc_dataset.max_depth)]
-    to_eval = (
-        torch.as_tensor(args.hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
-    )
+    # to_eval = (
+    #     torch.as_tensor(args.hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
+    # )
     Y_true_global = []
     with torch.no_grad():
         for inputs, targets, global_targets in args.test_loader:
@@ -198,25 +200,35 @@ def test(args):
     for target, output in zip(local_inputs, local_outputs):
         score = average_precision_score(target, output, average="micro")  # micro score
         local_val_score.append(score)
-    logging.info(f"Local test score: {local_val_score}")
-    # Concat global targets
-    Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
+    logging.info("Local test score: %s", str(local_val_score))
 
-    Y_pred_global = local_to_global_predictions(
-        local_outputs,
-        args.hmc_dataset.train.local_nodes_idx,
-        args.hmc_dataset.train.nodes_idx,
+    job_id = create_job_id_name(prefix="test")
+
+    create_dir("results/train")
+
+    save_dict_to_json(
+        score,
+        f"results/train/{args.dataset_name}-{job_id}.json",
     )
+
+    # Concat global targets
+    # Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()
+
+    # Y_pred_global = local_to_global_predictions(
+    #     local_outputs,
+    #     args.hmc_dataset.train.local_nodes_idx,
+    #     args.hmc_dataset.train.nodes_idx,
+    # )
 
     # Y_true_global_converted = local_to_global_predictions(
     #     local_inputs, train.local_nodes_idx, train.nodes_idx
     # )
 
-    score = average_precision_score(
-        Y_true_global_original[:, to_eval], Y_pred_global[:, to_eval], average="micro"
-    )
+    # score = average_precision_score(
+    #     Y_true_global_original[:, to_eval], Y_pred_global[:, to_eval], average="micro"
+    # )
 
-    logging.info(score)
+    # logging.info(score)
 
     return None
 
