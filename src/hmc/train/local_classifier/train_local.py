@@ -194,18 +194,24 @@ def test(args):
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
     # Get local scores
-    local_val_score = []
-    for target, output in zip(local_inputs, local_outputs):
-        score = average_precision_score(target, output, average="micro")  # micro score
-        local_val_score.append(score)
-    logging.info("Local test score: %s", str(local_val_score))
+    local_test_score = [0.0] * args.max_depth
+
+    for idx in args.active_levels:
+        logging.info(f"Evaluating level {idx}...")
+
+        score = average_precision_score(
+            local_inputs[idx], local_outputs[idx], average="micro"
+        )
+        local_test_score.append(score)
+
+    logging.info("Local test score: %s", str(local_test_score))
 
     job_id = create_job_id_name(prefix="test")
 
     create_dir("results/train")
 
     save_dict_to_json(
-        score,
+        local_test_score,
         f"results/train/{args.dataset_name}-{job_id}.json",
     )
 
