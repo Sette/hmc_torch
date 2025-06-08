@@ -162,4 +162,13 @@ def get_parser():
         help="List of values for weight decay (used when HPO is disabled).",
     )
 
+    parser.add_argument(
+        "--ephocs_to_evaluate",
+        type=int,
+        default=1,
+        metavar="EPOCHS_TO_EVALUATE",
+        required=False,
+        help="Number of epochs to evaluate the model during training.",
+    )
+
     return parser
