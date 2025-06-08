@@ -163,7 +163,7 @@ def get_parser():
     )
 
     parser.add_argument(
-        "--ephocs_to_evaluate",
+        "--epochs_to_evaluate",
         type=int,
         default=1,
         metavar="EPOCHS_TO_EVALUATE",

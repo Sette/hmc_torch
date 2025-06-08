@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from hmc.model.arguments import get_parser
+from hmc.arguments import get_parser
 from hmc.train.global_classifier.train_global import train_global
 from hmc.train.global_classifier.train_global_baseline import train_global_baseline
 from hmc.train.global_classifier.train_globalLM import train_globalLM

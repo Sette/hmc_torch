@@ -38,9 +38,6 @@ def run(args):
     args.best_val_loss = [float("inf")] * args.max_depth
     logging.info(f"Best val loss created {args.best_val_loss}")
 
-    args.epochs_to_eval = 10
-    args.count_epochs_eval = 0
-
     # optimizer = torch.optim.Adam(
     #     args.model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     # )
@@ -105,9 +102,10 @@ def run(args):
         show_local_losses(local_train_losses, set="Train")
         show_global_loss(global_train_loss, set="Train")
 
-        local_val_losses, local_val_precision = val(args)
-        show_local_losses(local_val_losses, set="Val")
-        show_local_precision(local_val_precision, set="Val")
+        if epoch % args.epochs_to_evaluate == 0:
+            local_val_losses, local_val_precision = val(args)
+            show_local_losses(local_val_losses, set="Val")
+            show_local_precision(local_val_precision, set="Val")
     return None
 
 
