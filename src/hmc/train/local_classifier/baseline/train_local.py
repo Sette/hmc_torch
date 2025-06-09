@@ -62,10 +62,6 @@ def train_step(args):
         # args.active_levels = [i for i, active in enumerate(args.level_active) if active]
         logging.info(f"Active levels: {args.active_levels}")
 
-        if not args.active_levels:
-            logging.info("All levels have triggered early stopping.")
-            break
-
         for inputs, targets, _ in args.train_loader:
 
             inputs, targets = inputs.to(args.device), [
@@ -109,6 +105,11 @@ def train_step(args):
             local_val_losses, local_val_precision = val_step(args)
             show_local_losses(local_val_losses, set="Val")
             show_local_precision(local_val_precision, set="Val")
+
+            if not any(args.level_active):
+                logging.info("All levels have triggered early stopping.")
+                break
+
     return None
 
 
@@ -172,28 +173,28 @@ def val_step(args):
 
 def test_step(args):
     args.model.eval()
-    local_inputs = [[] for _ in range(args.hmc_dataset.max_depth)]
-    local_outputs = [[] for _ in range(args.hmc_dataset.max_depth)]
+    local_inputs = [[] for _ in enumerate(args.active_levels)]
+    local_outputs = [[] for _ in enumerate(args.active_levels)]
 
     threshold = 0.5
 
     Y_true_global = []
     with torch.no_grad():
         for inputs, targets, global_targets in args.test_loader:
-
             inputs = inputs.to(args.device)
             targets = [target.to(args.device).float() for target in targets]
             global_targets = global_targets.to("cpu")
             outputs = args.model(inputs.float())
 
             for index, (output, target) in enumerate(zip(outputs, targets)):
-                output = output.to("cpu")
-                target = target.to("cpu")
-                local_inputs[index].append(target)
-                local_outputs[index].append(output)
+                if index in args.active_levels:
+                    output = output.to("cpu")
+                    target = target.to("cpu")
+                    local_inputs[index].append(target)
+                    local_outputs[index].append(output)
             Y_true_global.append(global_targets)
         # Concat all outputs and targets by level
-    local_inputs = [torch.cat(targets, dim=0) for targets in local_inputs]
+    local_inputs = [torch.cat(local_input, dim=0) for local_input in local_inputs]
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
     # Get local scores
@@ -374,6 +375,7 @@ def train_local(args):
             "hidden_size": hidden_dims,
             "num_layers": num_layers_values,
             "dropout": dropout_values,
+            "active_levels": args.active_levels,
         }
 
         model = HMCLocalModel(**params)

@@ -1,5 +1,7 @@
 import torch.nn as nn
 
+import logging
+
 
 def transform_predictions(predictions):
     transformed = []
@@ -72,9 +74,11 @@ class HMCLocalModel(nn.Module):
             print("levels_size is None, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is None")
         if not isinstance(levels_size, dict):
-            if active_levels is None:
-                print("levels_size is not a dict, error in HMCLocalClassificationModel")
-                raise ValueError("levels_size is not a dict")
+            print("levels_size is not a dict, error in HMCLocalClassificationModel")
+            raise ValueError("levels_size is not a dict")
+        if active_levels is None:
+            print("active_levels is not valid, error in HMCLocalClassificationModel")
+            raise ValueError("active_levels is not valid")
 
         self.input_size = input_size
         self.levels_size = levels_size
@@ -83,35 +87,26 @@ class HMCLocalModel(nn.Module):
         self.dropout = dropout
         self.levels = nn.ModuleList()
         self.active_levels = active_levels
-
-        if active_levels is not None:
-            self.model = BuildClassification(
-                input_shape=input_size,
-                hidden_size=hidden_size,
-                output_size=levels_size,
-                nb_layers=num_layers,
-                dropout_rate=dropout,
-            )
-        else:
-            self.max_depth = len(levels_size)
-            for index, level_size in enumerate(levels_size.values()):
-                self.levels.append(
-                    BuildClassification(
-                        input_shape=input_size,
-                        hidden_size=hidden_size[index],
-                        output_size=level_size,
-                        nb_layers=num_layers[index],
-                        dropout_rate=dropout[index],
-                    )
+        self.max_depth = len(levels_size)
+        logging.info(
+            f"HMCLocalModel: input_size={input_size}, levels_size={levels_size}, "
+            f"hidden_size={hidden_size}, num_layers={num_layers}, dropout={dropout}, "
+            f"active_levels={active_levels}"
+        )
+        for index in active_levels:
+            self.levels.append(
+                BuildClassification(
+                    input_shape=input_size,
+                    hidden_size=hidden_size[index],
+                    output_size=levels_size[index],
+                    nb_layers=num_layers[index],
+                    dropout_rate=dropout[index],
                 )
+            )
 
     def forward(self, x):
         outputs = []
-        if self.active_levels is not None:
-            output = self.model(x)
-            return output
-        else:
-            for idx, level in enumerate(self.levels):
-                local_output = level(x)
-                outputs.append(local_output)
-            return outputs
+        for idx, level in enumerate(self.levels):
+            local_output = level(x)
+            outputs.append(local_output)
+        return outputs
