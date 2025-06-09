@@ -7,10 +7,10 @@ import numpy as np
 import torch
 
 from hmc.arguments import get_parser
-from hmc.train.global_classifier.train_global import train_global
-from hmc.train.global_classifier.train_global_baseline import train_global_baseline
-from hmc.train.global_classifier.train_globalLM import train_globalLM
-from hmc.train.local_classifier.train_local import train_local
+from hmc.train.global_classifier.constrained.train_global import train_global
+from hmc.train.global_classifier.baseline.train_global import train_global_baseline
+from hmc.train.global_classifier.constrained.train_globalLM import train_globalLM
+from hmc.train.local_classifier.baseline.train_local import train_local
 from hmc.utils.dir import create_job_id
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))

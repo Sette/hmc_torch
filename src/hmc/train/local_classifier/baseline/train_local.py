@@ -6,12 +6,17 @@ import torch
 import torch.nn as nn
 from sklearn import preprocessing
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import (
+    average_precision_score,
+    precision_recall_fscore_support,
+)
 from torch.utils.data import DataLoader
 
 from hmc.dataset.manager.dataset_manager import initialize_dataset_experiments
 from hmc.model.local_classifier.baseline.model import HMCLocalModel
-from hmc.train.local_classifier.hpo.hpo_local import optimize_hyperparameters_per_level
+from hmc.train.local_classifier.baseline.hpo.hpo_local import (
+    optimize_hyperparameters_per_level,
+)
 from hmc.train.utils import (
     local_to_global_predictions,
     show_global_loss,
@@ -27,21 +32,19 @@ def save_dict_to_json(dictionary, file_path):
         json.dump(dictionary, json_file, ensure_ascii=False, indent=4)
 
 
-def run(args):
+def train_step(args):
     args.model = args.model.to(args.device)
     args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
     args.early_stopping_patience = 3
     args.patience_counters = [0] * args.hmc_dataset.max_depth
-    args.level_active = [True] * args.hmc_dataset.max_depth
+    # args.level_active = [True] * args.hmc_dataset.max_depth
+    args.level_active = [level in args.active_levels for level in range(args.max_depth)]
+    logging.info(f"Active levels: {args.active_levels}")
+    logging.info(f"Level active: {args.level_active}")
 
     args.best_val_loss = [float("inf")] * args.max_depth
     logging.info(f"Best val loss created {args.best_val_loss}")
-
-    # optimizer = torch.optim.Adam(
-    #     args.model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-    # )
-    # args.optimizer = optimizer
 
     optimizers = [
         torch.optim.Adam(
@@ -103,13 +106,13 @@ def run(args):
         show_global_loss(global_train_loss, set="Train")
 
         if epoch % args.epochs_to_evaluate == 0:
-            local_val_losses, local_val_precision = val(args)
+            local_val_losses, local_val_precision = val_step(args)
             show_local_losses(local_val_losses, set="Val")
             show_local_precision(local_val_precision, set="Val")
     return None
 
 
-def val(args):
+def val_step(args):
     args.model.eval()
     local_val_losses = [0.0] * args.max_depth
     output_val = [0.0] * args.max_depth
@@ -157,7 +160,7 @@ def val(args):
             )
             if args.patience_counters[i] >= args.early_stopping_patience:
                 args.level_active[i] = False
-                args.active_levels.remove(i)
+                # args.active_levels.remove(i)
                 logging.info(
                     f"🚫 Early stopping triggered for level {i} — freezing its parameters"
                 )
@@ -167,13 +170,13 @@ def val(args):
     return local_val_losses, local_val_precision
 
 
-def test(args):
+def test_step(args):
     args.model.eval()
     local_inputs = [[] for _ in range(args.hmc_dataset.max_depth)]
     local_outputs = [[] for _ in range(args.hmc_dataset.max_depth)]
-    # to_eval = (
-    #     torch.as_tensor(args.hmc_dataset.to_eval, dtype=torch.bool).clone().detach()
-    # )
+
+    threshold = 0.5
+
     Y_true_global = []
     with torch.no_grad():
         for inputs, targets, global_targets in args.test_loader:
@@ -194,15 +197,29 @@ def test(args):
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
     # Get local scores
-    local_test_score = [0.0] * args.max_depth
+    local_test_score = {
+        level: {"precision": 0.0, "f1": 0.0, "recall": 0.0}
+        for level in range(args.hmc_dataset.max_depth)
+    }
 
+    logging.info(f"Evaluating {len(args.active_levels)} active levels...")
     for idx in args.active_levels:
         logging.info(f"Evaluating level {idx}...")
 
-        score = average_precision_score(
-            local_inputs[idx], local_outputs[idx], average="micro"
+        y_pred_binary = local_outputs[idx].data > threshold
+
+        # y_pred_binary = (local_outputs[idx] > threshold).astype(int)
+
+        score = precision_recall_fscore_support(
+            local_inputs[idx], y_pred_binary, average="micro"
         )
-        local_test_score.append(score)
+
+        local_test_score[idx]["precision"] = score[0]
+        local_test_score[idx]["recall"] = score[1]
+        local_test_score[idx]["f1"] = score[2]
+        logging.info(
+            f"Level {idx} - Precision: {score[0]:.4f}, Recall: {score[1]:.4f}, F1: {score[2]:.4f}"
+        )
 
     logging.info("Local test score: %s", str(local_test_score))
 
@@ -366,5 +383,5 @@ def train_local(args):
         # model = HMCLocalClassificationModel(levels_size=hmc_dataset.levels_size,
         #                                     input_size=args.input_dims[data],
         #                                     hidden_size=args.hidden_dim)
-        run(args)
-        test(args)
+        train_step(args)
+        test_step(args)
