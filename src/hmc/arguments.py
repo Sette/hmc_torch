@@ -45,6 +45,14 @@ def get_parser():
     )
 
     parser.add_argument(
+        "--patience",
+        type=int,
+        default=5,
+        required=False,
+        help="Number of epochs with no improvement after which training will be stopped.",
+    )
+
+    parser.add_argument(
         "--dataset_type",
         type=str,
         choices=["csv", "torch", "arff"],

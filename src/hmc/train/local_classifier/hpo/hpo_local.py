@@ -53,15 +53,16 @@ def optimize_hyperparameters_per_level(args):
         args.model = args.model.to(args.device)
         args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
-        args.patience_counters = [0] * args.hmc_dataset.max_depth
-        args.level_active = [False] * args.hmc_dataset.max_depth
-        args.level_active[level] = True
+        patience = args.patience if args.patience is not None else 3
+        patience_counter = patience
+        level_active = [False] * args.hmc_dataset.max_depth
+        level_active[level] = True
 
-        args.best_val_loss = [float("inf")] * args.max_depth
-        args.best_val_precision = [0.0] * args.max_depth
+        best_val_loss = float("inf")
+        best_val_precision = 0.0
 
         logging.info(f"Levels to evaluate: {args.active_levels}")
-        logging.info(f"Best val loss created {args.best_val_loss}")
+        logging.info(f"Best val loss created {best_val_loss}")
 
         for epoch in range(1, args.epochs + 1):
             args.model.train()
@@ -99,18 +100,29 @@ def optimize_hyperparameters_per_level(args):
             show_global_loss(global_train_loss, set=f"Train-{trial.number}")
 
             if epoch % args.epochs_to_evaluate == 0:
-                local_val_losses, local_val_precision = val_optimizer(args)
+                local_val_loss, local_val_precision = val_optimizer(args)
+
+                if local_val_loss < best_val_loss:
+                    best_val_loss = local_val_loss
+                else:
+                    patience_counter -= 1
+
+                if patience_counter == 0:
+                    logging.info(
+                        f"Early stopping triggered for trial {trial.number} at epoch {epoch}."
+                    )
+                    break
 
                 # Reporta o valor de validação para Optuna
-                trial.report(local_val_losses, step=epoch)
+                trial.report(local_val_loss, step=epoch)
 
-                logging.info(f"Local loss {trial.number}: {local_val_losses}")
+                logging.info(f"Local loss {trial.number}: {local_val_loss}")
                 logging.info(f"Local precision {trial.number}: {local_val_precision}")
 
                 # Early stopping (pruning)
                 if trial.should_prune():
                     raise optuna.TrialPruned()
-        return local_val_losses
+        return args.best_val_loss
 
     best_params_per_level = {}
 
