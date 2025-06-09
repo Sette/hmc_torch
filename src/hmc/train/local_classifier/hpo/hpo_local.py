@@ -122,7 +122,7 @@ def optimize_hyperparameters_per_level(args):
                 # Early stopping (pruning)
                 if trial.should_prune():
                     raise optuna.TrialPruned()
-        return args.best_val_loss
+        return best_val_loss
 
     best_params_per_level = {}
 
