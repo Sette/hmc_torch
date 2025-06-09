@@ -21,7 +21,6 @@ def save_dict_to_json(dictionary, file_path):
 
 def optimize_hyperparameters_per_level(args):
     def objective(trial, level):
-        ephocs_to_eval = 1
         logging.info(f"Tentativa número: {trial.number}")
         hidden_dim = trial.suggest_int(f"hidden_dim_level_{level}", 64, 512, log=True)
         lr_by_level = trial.suggest_float(f"lr_level_{level}", 1e-6, 1e-3, log=True)
@@ -54,7 +53,6 @@ def optimize_hyperparameters_per_level(args):
         args.model = args.model.to(args.device)
         args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
-        args.early_stopping_patience = 3
         args.patience_counters = [0] * args.hmc_dataset.max_depth
         args.level_active = [False] * args.hmc_dataset.max_depth
         args.level_active[level] = True
@@ -119,6 +117,13 @@ def optimize_hyperparameters_per_level(args):
     create_dir("results/hpo")
     # Add stream handler of stdout to show the messages
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
+
+    if args.active_levels is None:
+        args.active_levels = [i for i in range(args.max_depth)]
+        logging.info(f"Active levels: {args.active_levels}")
+    else:
+        args.active_levels = [int(x) for x in args.active_levels]
+        logging.info(f"Active levels: {args.active_levels}")
 
     for level in args.active_levels:
         args.level = level
