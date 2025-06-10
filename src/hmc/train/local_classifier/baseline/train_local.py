@@ -198,10 +198,7 @@ def test_step(args):
     local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
 
     # Get local scores
-    local_test_score = {
-        level: {"precision": 0.0, "f1": 0.0, "recall": 0.0}
-        for level in range(args.hmc_dataset.max_depth)
-    }
+    local_test_score = {level: None for _, level in enumerate(args.active_levels)}
 
     logging.info(f"Evaluating {len(args.active_levels)} active levels...")
     for idx in args.active_levels:
@@ -215,12 +212,7 @@ def test_step(args):
             local_inputs[idx], y_pred_binary, average="micro"
         )
 
-        local_test_score[idx]["precision"] = score[0]
-        local_test_score[idx]["recall"] = score[1]
-        local_test_score[idx]["f1"] = score[2]
-        logging.info(
-            f"Level {idx} - Precision: {score[0]:.4f}, Recall: {score[1]:.4f}, F1: {score[2]:.4f}"
-        )
+        local_test_score[idx] = score
 
     logging.info("Local test score: %s", str(local_test_score))
 
