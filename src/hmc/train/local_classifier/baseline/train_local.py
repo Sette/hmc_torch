@@ -173,8 +173,8 @@ def val_step(args):
 
 def test_step(args):
     args.model.eval()
-    local_inputs = [[] for _ in enumerate(args.active_levels)]
-    local_outputs = [[] for _ in enumerate(args.active_levels)]
+    local_inputs = {level: [] for _, level in enumerate(args.active_levels)}
+    local_outputs = {level: [] for _, level in enumerate(args.active_levels)}
 
     threshold = 0.5
 
@@ -194,9 +194,13 @@ def test_step(args):
                     local_outputs[index].append(output)
             Y_true_global.append(global_targets)
         # Concat all outputs and targets by level
-    local_inputs = [torch.cat(local_input, dim=0) for local_input in local_inputs]
-    local_outputs = [torch.cat(outputs, dim=0) for outputs in local_outputs]
-
+    local_inputs = {
+        level: torch.cat(local_input, dim=0)
+        for level, local_input in local_inputs.items()
+    }
+    local_outputs = {
+        key: torch.cat(outputs, dim=0) for key, outputs in local_outputs.items()
+    }
     # Get local scores
     local_test_score = {level: None for _, level in enumerate(args.active_levels)}
 
@@ -341,7 +345,6 @@ def train_local(args):
 
     if args.hpo == "true":
         logging.info("Hyperparameter optimization")
-        args.n_trials = 20
         best_params = optimize_hyperparameters_per_level(args=args)
 
         logging.info(best_params)
