@@ -249,7 +249,7 @@ def test_step(args):
     local_inputs = {level: [] for _, level in enumerate(args.active_levels)}
     local_outputs = {level: [] for _, level in enumerate(args.active_levels)}
 
-    threshold = 0.5
+    threshold = 0.3
 
     Y_true_global = []
     with torch.no_grad():
@@ -299,6 +299,10 @@ def test_step(args):
         local_test_score,
         f"results/train/{args.dataset_name}-{job_id}.json",
     )
+
+    # Save the trained model
+    torch.save(args.model.state_dict(), f"results/train/{args.dataset_name}-{job_id}-state_dict.pt")
+    # args.model.save(f"results/train/{args.dataset_name}-{job_id}.pt")
 
     # Concat global targets
     # Y_true_global_original = torch.cat(Y_true_global, dim=0).numpy()

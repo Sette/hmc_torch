@@ -1,4 +1,3 @@
-import json
 import logging
 import sys
 import optuna
@@ -10,24 +9,79 @@ from hmc.train.utils import (
     create_job_id_name,
     show_global_loss,
     show_local_losses,
+    save_dict_to_json,
 )
 from hmc.utils.dir import create_dir
 
 
-def save_dict_to_json(dictionary, file_path):
-    with open(file_path, "w", encoding="utf-8") as json_file:
-        json.dump(dictionary, json_file, ensure_ascii=False, indent=4)
-
-
 def optimize_hyperparameters_per_level(args):
+    """
+    Optimize hyperparameters for each active level of a hierarchical multi-class (HMC) local classifier using Optuna.
+    This function performs hyperparameter optimization for each specified level in \
+        a hierarchical classification model.
+    For each level, it runs an Optuna study to find the best combination of hyperparameters (hidden dimension, \
+        learning rate, dropout, number of layers, and weight decay) that minimizes the validation loss. \
+    The best hyperparameters for each level are saved to a JSON file.
+    Args:
+        args: An object containing all necessary arguments and configurations, including:
+            - levels_size (list): Number of classes per level.
+            - input_dims (dict): Input dimensions per dataset.
+            - data (str): Dataset identifier.
+            - device (torch.device): Device to run the model on.
+            - criterions (list): List of loss functions, one per level.
+            - patience (int, optional): Number of epochs to wait for improvement before early stopping.
+            - hmc_dataset: Dataset object with attribute max_depth.
+            - epochs (int): Number of training epochs per trial.
+            - epochs_to_evaluate (int): Frequency (in epochs) to evaluate on validation set.
+            - train_loader (DataLoader): DataLoader for training data.
+            - val_optimizer (callable): Function to evaluate validation loss and precision.
+            - n_trials (int): Number of Optuna trials per level.
+            - active_levels (list or None): List of levels to optimize. If None, all levels are optimized.
+            - max_depth (int): Maximum depth (number of levels) in the hierarchy.
+            - dataset_name (str): Name of the dataset.
+    Returns:
+        dict: A dictionary mapping each optimized level to its best hyperparameters, e.g.,
+            {
+                level_0: {
+                    "hidden_dim": ...,
+                    "lr": ...,
+                    "dropout": ...,
+                    "num_layers": ...,
+                    "weight_decay": ...
+                },
+                ...
+    Side Effects:
+        - Saves the best hyperparameters per level to a JSON file in 'results/hpo/'.
+        - Logs progress and results to the logging system and stdout.
+    Raises:
+        optuna.TrialPruned: If a trial is pruned by Optuna's early stopping mechanism.
+    """
+
     def objective(trial, level):
-        logging.info(f"Tentativa número: {trial.number}")
-        hidden_dim = trial.suggest_int(f"hidden_dim_level_{level}", 64, 512, log=True)
-        lr_by_level = trial.suggest_float(f"lr_level_{level}", 1e-6, 1e-3, log=True)
-        dropout = trial.suggest_float(f"dropout_level_{level}", 0.3, 0.8, log=True)
-        num_layers = trial.suggest_int(f"num_layers_level_{level}", 1, 3, log=True)
+        """
+        Objective function for Optuna hyperparameter optimization of a hierarchical multi-class local classifier.
+        This function defines the training and validation loop for a single Optuna trial, optimizing hyperparameters
+        such as hidden dimension size, learning rate, dropout, number of layers, and weight decay for a specific level
+        in a hierarchical classification model. It performs model training, validation, and early stopping based on
+        validation loss, and reports results to Optuna for pruning and optimization.
+        Args:
+            trial (optuna.trial.Trial): The Optuna trial object used for suggesting hyperparameters \
+                and reporting results.
+            level (int): The hierarchical level for which the model is being optimized.
+        Returns:
+            float: The best validation loss achieved during training for the current trial.
+        Raises:
+            optuna.TrialPruned: If Optuna determines that the trial should be pruned early based on \
+                intermediate results.
+        """
+
+        logging.info("Tentativa número: %d", trial.number)
+        hidden_dim = trial.suggest_int("hidden_dim_level_%d" % level, 64, 512, log=True)
+        lr_by_level = trial.suggest_float("lr_level_%d" % level, 1e-6, 1e-3, log=True)
+        dropout = trial.suggest_float("dropout_level_%d" % level, 0.3, 0.8, log=True)
+        num_layers = trial.suggest_int("num_layers_level_%d" % level, 1, 3, log=True)
         weight_decay = trial.suggest_float(
-            f"weight_decay_level_{level}", 1e-6, 1e-2, log=True
+            "weight_decay_level_%d" % level, 1e-6, 1e-2, log=True
         )
 
         active_levels_train = [level]
@@ -59,10 +113,10 @@ def optimize_hyperparameters_per_level(args):
         level_active[level] = True
 
         best_val_loss = float("inf")
-        best_val_precision = 0.0
+        # best_val_precision = 0.0
 
-        logging.info(f"Levels to evaluate: {args.active_levels}")
-        logging.info(f"Best val loss created {best_val_loss}")
+        logging.info("Levels to evaluate: %s", args.active_levels)
+        logging.info("Best val loss created %f", best_val_loss)
 
         for epoch in range(1, args.epochs + 1):
             args.model.train()
@@ -95,7 +149,7 @@ def optimize_hyperparameters_per_level(args):
                 sum(non_zero_losses) / len(non_zero_losses) if non_zero_losses else 0
             )
 
-            logging.info(f"Trial {trial.number} - Epoch {epoch}/{args.epochs}")
+            logging.info("Trial %d - Epoch %d/%d", trial.number, epoch, args.epochs)
             show_local_losses(local_train_losses, set=f"Train-{trial.number}")
             show_global_loss(global_train_loss, set=f"Train-{trial.number}")
 
@@ -109,15 +163,19 @@ def optimize_hyperparameters_per_level(args):
 
                 if patience_counter == 0:
                     logging.info(
-                        f"Early stopping triggered for trial {trial.number} at epoch {epoch}."
+                        "Early stopping triggered for trial %d at epoch %d.",
+                        trial.number,
+                        epoch,
                     )
                     break
 
                 # Reporta o valor de validação para Optuna
                 trial.report(local_val_loss, step=epoch)
 
-                logging.info(f"Local loss {trial.number}: {local_val_loss}")
-                logging.info(f"Local precision {trial.number}: {local_val_precision}")
+                logging.info("Local loss %d: %f", trial.number, local_val_loss)
+                logging.info(
+                    "Local precision %d: %f", trial.number, local_val_precision
+                )
 
                 # Early stopping (pruning)
                 if trial.should_prune():
@@ -132,19 +190,19 @@ def optimize_hyperparameters_per_level(args):
 
     if args.active_levels is None:
         args.active_levels = [i for i in range(args.max_depth)]
-        logging.info(f"Active levels: {args.active_levels}")
+        logging.info("Active levels: %s", args.active_levels)
     else:
         args.active_levels = [int(x) for x in args.active_levels]
-        logging.info(f"Active levels: {args.active_levels}")
+        logging.info("Active levels: %s", args.active_levels)
 
     for level in args.active_levels:
         args.level = level
-        logging.info(f"\n🔍 Optimizing hyperparameters for level {level}...\n")
+        logging.info("\n🔍 Optimizing hyperparameters for level %d...\n", level)
 
         study = optuna.create_study()
 
         study.optimize(
-            lambda trial: objective(trial, level),
+            lambda trial: objective(trial, args.level),
             n_trials=args.n_trials,
         )
 
@@ -158,7 +216,9 @@ def optimize_hyperparameters_per_level(args):
 
         best_params_per_level[level] = level_parameters
 
-        logging.info(f"✅ Best hyperparameters for level {level}: {study.best_params}")
+        logging.info(
+            "✅ Best hyperparameters for level %s: %s", level, study.best_params
+        )
 
     job_id = create_job_id_name(prefix="hpo")
 
@@ -171,6 +231,21 @@ def optimize_hyperparameters_per_level(args):
 
 
 def val_optimizer(args):
+    """
+    Evaluates the model on the validation set and computes the average loss and average precision score.
+    Args:
+        args: An object containing the following attributes:
+            - model: The PyTorch model to evaluate.
+            - val_loader: DataLoader for the validation dataset.
+            - device: The device (CPU or CUDA) to use for computation.
+            - criterions: A list or dict of loss functions for each level.
+            - level: The current level to evaluate.
+    Returns:
+        tuple:
+            - local_val_loss (float): The average validation loss over all batches.
+            - local_val_precision (float): The average precision score (micro-averaged) over the validation set.
+    """
+
     args.model.eval()
     local_val_loss = 0.0
     output_val = 0.0
