@@ -1,4 +1,3 @@
-import json
 import logging
 
 import numpy as np
@@ -17,22 +16,46 @@ from hmc.model.local_classifier.baseline.model import HMCLocalModel
 from hmc.train.local_classifier.baseline.hpo.hpo_local import (
     optimize_hyperparameters_per_level,
 )
+
 from hmc.train.utils import (
-    local_to_global_predictions,
     show_global_loss,
     show_local_losses,
     show_local_precision,
     create_job_id_name,
+    save_dict_to_json,
 )
 from hmc.utils.dir import create_dir
 
 
-def save_dict_to_json(dictionary, file_path):
-    with open(file_path, "w", encoding="utf-8") as json_file:
-        json.dump(dictionary, json_file, ensure_ascii=False, indent=4)
-
-
 def train_step(args):
+    """
+    Executes the training loop for a hierarchical multi-class (HMC) local classifier model.
+    This function performs the following steps:
+    - Moves the model and loss criterions to the specified device.
+    - Initializes early stopping parameters and tracking variables for each level of the hierarchy.
+    - Sets up optimizers for each model level with individual learning rates and weight decays.
+    - Iterates over the specified number of epochs, performing:
+        - Training over batches: forward pass, loss computation for active levels, and gradient accumulation.
+        - Backward pass and optimizer step for each level.
+        - Logging of training losses.
+        - Periodic evaluation on the validation set, including loss and precision reporting.
+        - Early stopping if all levels have triggered it.
+    Args:
+        args: An object containing all necessary training parameters and objects, including:
+            - model: The hierarchical model with per-level submodules.
+            - criterions: List of loss functions for each level.
+            - device: Device to run computations on.
+            - hmc_dataset: Dataset object with max_depth attribute.
+            - active_levels: List of currently active levels for training.
+            - max_depth: Maximum depth of the hierarchy.
+            - lr_values: List of learning rates for each level.
+            - weight_decay_values: List of weight decay values for each level.
+            - epochs: Number of training epochs.
+            - train_loader: DataLoader for training data.
+            - epochs_to_evaluate: Frequency of validation evaluation.
+            - Additional attributes used for logging and early stopping.
+    """
+
     args.model = args.model.to(args.device)
     args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
@@ -40,11 +63,12 @@ def train_step(args):
     args.patience_counters = [0] * args.hmc_dataset.max_depth
     # args.level_active = [True] * args.hmc_dataset.max_depth
     args.level_active = [level in args.active_levels for level in range(args.max_depth)]
-    logging.info(f"Active levels: {args.active_levels}")
-    logging.info(f"Level active: {args.level_active}")
+    logging.info("Active levels: %s", args.active_levels)
+    logging.info("Level active: %s", args.level_active)
 
     args.best_val_loss = [float("inf")] * args.max_depth
-    logging.info(f"Best val loss created {args.best_val_loss}")
+    args.best_model = [None] * args.max_depth
+    logging.info("Best val loss created %s", args.best_val_loss)
 
     optimizers = [
         torch.optim.Adam(
@@ -60,7 +84,7 @@ def train_step(args):
         args.model.train()
         local_train_losses = [0.0 for _ in range(args.hmc_dataset.max_depth)]
         # args.active_levels = [i for i, active in enumerate(args.level_active) if active]
-        logging.info(f"Active levels: {args.active_levels}")
+        logging.info("Active levels: %s", args.active_levels)
 
         for inputs, targets, _ in args.train_loader:
 
@@ -97,7 +121,7 @@ def train_step(args):
             sum(non_zero_losses) / len(non_zero_losses) if non_zero_losses else 0
         )
 
-        logging.info(f"Epoch {epoch}/{args.epochs}")
+        logging.info("Epoch %d/%d", epoch, args.epochs)
         show_local_losses(local_train_losses, set="Train")
         show_global_loss(global_train_loss, set="Train")
 
@@ -108,12 +132,37 @@ def train_step(args):
 
             if not any(args.level_active):
                 logging.info("All levels have triggered early stopping.")
+                for i in args.active_levels:
+                    args.model.levels[i].load_state_dict(args.best_model[i])
                 break
-
-    return None
 
 
 def val_step(args):
+    """
+    Performs a validation step for a hierarchical multi-level classifier model.
+    Args:
+        args: An object containing all necessary arguments and attributes, including:
+            - model: The model to evaluate, with attribute `levels` for each depth.
+            - val_loader: DataLoader for the validation dataset.
+            - criterions: List of loss functions, one per level.
+            - device: Device to run computations on.
+            - max_depth: Maximum number of levels in the hierarchy.
+            - active_levels: List of indices for currently active levels.
+            - best_val_loss: List of best validation losses per level.
+            - best_model: List to store the best model state_dict per level.
+            - patience_counters: List of patience counters for early stopping per level.
+            - early_stopping_patience: Number of epochs to wait before early stopping.
+            - level_active: List indicating if a level is still active.
+    Returns:
+        tuple:
+            - local_val_losses (list of float): Average validation loss per level.
+            - local_val_precision (list of float): Average precision score per level.
+    Side Effects:
+        - Updates `args.best_val_loss`, `args.best_model`, and `args.patience_counters` for improved levels.
+        - Freezes parameters of levels that triggered early stopping by setting `requires_grad` to False.
+        - Logs progress and early stopping events.
+    """
+
     args.model.eval()
     local_val_losses = [0.0] * args.max_depth
     output_val = [0.0] * args.max_depth
@@ -147,23 +196,30 @@ def val_step(args):
         )
 
     local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
-    logging.info(f"Levels to evaluate: {args.active_levels}")
+    logging.info("Levels to evaluate: %s", args.active_levels)
     for i in args.active_levels:
+        if args.best_model[i] is None:
+            args.best_model[i] = args.model.levels[i].state_dict()
+            logging.info("Level %d: initialized best model", i)
         if round(local_val_losses[i].item(), 4) < args.best_val_loss[i]:
             args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
+            args.best_model[i] = args.model.levels[i].state_dict()
             args.patience_counters[i] = 0
-            logging.info(f"Level {i}: improved (loss={local_val_losses[i]:.4f})")
+            logging.info("Level %d: improved (loss=%.4f)", i, local_val_losses[i])
         else:
             args.patience_counters[i] += 1
             logging.info(
-                f"Level {i}: no improvement \
-                (patience {args.patience_counters[i]}/{args.early_stopping_patience})"
+                "Level %d: no improvement (patience %d/%d)",
+                i,
+                args.patience_counters[i],
+                args.early_stopping_patience,
             )
             if args.patience_counters[i] >= args.early_stopping_patience:
                 args.level_active[i] = False
                 # args.active_levels.remove(i)
                 logging.info(
-                    f"🚫 Early stopping triggered for level {i} — freezing its parameters"
+                    "🚫 Early stopping triggered for level %d — freezing its parameters",
+                    i,
                 )
                 # ❄️ Congelar os parâmetros desse nível
                 for param in args.model.levels[i].parameters():
@@ -172,6 +228,23 @@ def val_step(args):
 
 
 def test_step(args):
+    """
+    Evaluates the model on the test dataset for each active level and saves the results.
+    Args:
+        args: An object containing the following attributes:
+            - model: The trained model to evaluate.
+            - test_loader: DataLoader providing test data batches (inputs, targets, global_targets).
+            - device: The device (CPU or CUDA) to run computations on.
+            - active_levels: Iterable of indices indicating which levels to evaluate.
+            - dataset_name: Name of the dataset (used for saving results).
+            - hmc_dataset: Dataset object containing hierarchical information (optional, for global evaluation).
+    Returns:
+        None. The function saves the evaluation results as a JSON file in the 'results/train' directory.
+    Side Effects:
+        - Logs evaluation progress and results.
+        - Saves local test scores (precision, recall, f-score, support) for each active level to a JSON file.
+    """
+
     args.model.eval()
     local_inputs = {level: [] for _, level in enumerate(args.active_levels)}
     local_outputs = {level: [] for _, level in enumerate(args.active_levels)}
@@ -204,10 +277,8 @@ def test_step(args):
     # Get local scores
     local_test_score = {level: None for _, level in enumerate(args.active_levels)}
 
-    logging.info(f"Evaluating {len(args.active_levels)} active levels...")
+    logging.info("Evaluating %d active levels...", len(args.active_levels))
     for idx in args.active_levels:
-        logging.info(f"Evaluating level {idx}...")
-
         y_pred_binary = local_outputs[idx].data > threshold
 
         # y_pred_binary = (local_outputs[idx] > threshold).astype(int)
@@ -248,12 +319,36 @@ def test_step(args):
 
     # logging.info(score)
 
-    return None
-
 
 def train_local(args):
+    """
+    Trains a local hierarchical multi-label classifier using the specified arguments.
+    This function sets up the experiment environment, loads and preprocesses the dataset,
+    creates data loaders for training, validation, and testing, initializes loss functions,
+    and either performs hyperparameter optimization or trains the model with provided hyperparameters.
+    Args:
+        args: An argparse.Namespace or similar object containing the following attributes:
+            - dataset_name (str): Name of the dataset in the format "data_ontology".
+            - device (str): Device to use ("cpu" or "cuda").
+            - batch_size (int): Batch size for data loaders.
+            - input_dims (dict): Dictionary mapping dataset names to input dimensions.
+            - hpo (str): Whether to perform hyperparameter optimization ("true" or "false").
+            - lr_values (list): List of learning rates per level.
+            - dropout_values (list): List of dropout rates per level.
+            - hidden_dims (list): List of hidden layer sizes per level.
+            - num_layers_values (list): List of number of layers per level.
+            - weight_decay_values (list): List of weight decay values per level.
+            - active_levels (list or None): List of active levels to train, or None for all.
+            - Other attributes required by downstream functions.
+    Side Effects:
+        - Updates the `args` object with data loaders, dataset information, loss functions, and model.
+        - Logs experiment information and progress.
+    Raises:
+        AssertionError: If the lengths of hyperparameter lists do not match the number of levels.
+    """
+
     logging.info(".......................................")
-    logging.info("Experiment with {} dataset ".format(args.dataset_name))
+    logging.info("Experiment with %s dataset", args.dataset_name)
     # Load train, val and test set
 
     if args.device.startswith("cuda") and not torch.cuda.is_available():
@@ -335,10 +430,9 @@ def train_local(args):
     args.to_eval = hmc_dataset.to_eval
     if args.active_levels is None:
         args.active_levels = [i for i in range(args.max_depth)]
-        logging.info(f"Active levels: {args.active_levels}")
     else:
         args.active_levels = [int(x) for x in args.active_levels]
-        logging.info(f"Active levels: {args.active_levels}")
+    logging.info("Active levels: %s", args.active_levels)
 
     criterions = [nn.BCELoss() for _ in hmc_dataset.levels_size]
     args.criterions = criterions
