@@ -106,8 +106,8 @@ def train_step(args):
                 local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
-        for total_loss in local_train_losses:
-            if total_loss > 0:
+        for idx, total_loss in enumerate(local_train_losses):
+            if total_loss > 0 and args.level_active[idx]:
                 total_loss.backward()
         # args.optimizer.step()
         for optimizer in args.optimizers:
@@ -198,32 +198,33 @@ def val_step(args):
     local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
     logging.info("Levels to evaluate: %s", args.active_levels)
     for i in args.active_levels:
-        if args.best_model[i] is None:
-            args.best_model[i] = args.model.levels[i].state_dict()
-            logging.info("Level %d: initialized best model", i)
-        if round(local_val_losses[i].item(), 4) < args.best_val_loss[i]:
-            args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
-            args.best_model[i] = args.model.levels[i].state_dict()
-            args.patience_counters[i] = 0
-            logging.info("Level %d: improved (loss=%.4f)", i, local_val_losses[i])
-        else:
-            args.patience_counters[i] += 1
-            logging.info(
-                "Level %d: no improvement (patience %d/%d)",
-                i,
-                args.patience_counters[i],
-                args.early_stopping_patience,
-            )
-            if args.patience_counters[i] >= args.early_stopping_patience:
-                args.level_active[i] = False
-                # args.active_levels.remove(i)
+        if args.level_active[i]:
+            if args.best_model[i] is None:
+                args.best_model[i] = args.model.levels[i].state_dict()
+                logging.info("Level %d: initialized best model", i)
+            if round(local_val_losses[i].item(), 4) < args.best_val_loss[i]:
+                args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
+                args.best_model[i] = args.model.levels[i].state_dict()
+                args.patience_counters[i] = 0
+                logging.info("Level %d: improved (loss=%.4f)", i, local_val_losses[i])
+            else:
+                args.patience_counters[i] += 1
                 logging.info(
-                    "🚫 Early stopping triggered for level %d — freezing its parameters",
+                    "Level %d: no improvement (patience %d/%d)",
                     i,
+                    args.patience_counters[i],
+                    args.early_stopping_patience,
                 )
-                # ❄️ Congelar os parâmetros desse nível
-                for param in args.model.levels[i].parameters():
-                    param.requires_grad = False
+                if args.patience_counters[i] >= args.early_stopping_patience:
+                    args.level_active[i] = False
+                    # args.active_levels.remove(i)
+                    logging.info(
+                        "🚫 Early stopping triggered for level %d — freezing its parameters",
+                        i,
+                    )
+                    # ❄️ Congelar os parâmetros desse nível
+                    for param in args.model.levels[i].parameters():
+                        param.requires_grad = False
     return local_val_losses, local_val_precision
 
 
