@@ -83,7 +83,7 @@ def valid_step(args):
         if args.best_model[i] is None:
             args.best_model[i] = args.model.levels[str(i)].state_dict()
             logging.info("Level %d: initialized best model", i)
-        if round(local_val_score[i], 4) >= args.best_val_score[i]:
+        if round(local_val_score[i], 4) > args.best_val_score[i]:
             args.best_val_score[i] = round(local_val_score[i], 4)
             args.best_model[i] = args.model.levels[str(i)].state_dict()
             args.patience_counters[i] = 0

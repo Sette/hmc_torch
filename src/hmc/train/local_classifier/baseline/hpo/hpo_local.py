@@ -2,7 +2,7 @@ import logging
 import sys
 import optuna
 import torch
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import precision_recall_fscore_support, average_precision_score
 
 from hmc.model.local_classifier.baseline.model import HMCLocalModelHPO
 from hmc.train.utils import (
@@ -113,6 +113,7 @@ def optimize_hyperparameters_per_level(args):
         level_active[level] = True
 
         best_val_loss = float("inf")
+        best_val_f1 = 0.0
         # best_val_precision = 0.0
 
         logging.info("Levels to evaluate: %s", args.active_levels)
@@ -154,10 +155,10 @@ def optimize_hyperparameters_per_level(args):
             show_global_loss(global_train_loss, dataset=f"Train-{trial.number}")
 
             if epoch % args.epochs_to_evaluate == 0:
-                local_val_loss, local_val_precision = val_optimizer(args)
+                local_val_loss, local_val_f1 = val_optimizer(args)
 
-                if local_val_loss < best_val_loss:
-                    best_val_loss = local_val_loss
+                if local_val_f1 > best_val_f1:
+                    best_val_f1 = local_val_f1
                 else:
                     patience_counter -= 1
 
@@ -170,17 +171,17 @@ def optimize_hyperparameters_per_level(args):
                     break
 
                 # Reporta o valor de validação para Optuna
-                trial.report(local_val_loss, step=epoch)
+                trial.report(local_val_f1, step=epoch)
 
                 logging.info("Local loss %d: %f", trial.number, local_val_loss)
                 logging.info(
-                    "Local precision %d: %f", trial.number, local_val_precision
+                    "Local F1 %d: %f", trial.number, local_val_f1
                 )
 
                 # Early stopping (pruning)
                 if trial.should_prune():
                     raise optuna.TrialPruned()
-        return best_val_loss
+        return best_val_f1
 
     best_params_per_level = {}
 
@@ -251,6 +252,7 @@ def val_optimizer(args):
     output_val = 0.0
     y_val = 0.0
     local_val_precision = 0.0
+    local_val_f1 = 0.0
 
     with torch.no_grad():
         for level, (inputs, targets, _) in enumerate(args.val_loader):
@@ -272,8 +274,20 @@ def val_optimizer(args):
                 y_val = torch.cat((y_val, target.to("cpu")), dim=0)
 
     local_val_precision = average_precision_score(y_val, output_val, average="micro")
+    score = precision_recall_fscore_support(
+        y_val.numpy(),
+        output_val.numpy() > 0.5,
+        average="micro",
+    )
+    local_val_f1 = score[2]
+    logging.info(
+        "Validation Loss: %.4f, Validation Precision: %.4f, Validation F1: %.4f",
+        local_val_loss,
+        local_val_precision,
+        local_val_f1,
+    )
 
     local_val_loss = local_val_loss / len(args.val_loader)
     # logging.info(f"Levels to evaluate: {args.active_levels}")
 
-    return local_val_loss, local_val_precision
+    return local_val_loss, local_val_f1

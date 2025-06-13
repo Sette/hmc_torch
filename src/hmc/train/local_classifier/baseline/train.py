@@ -42,7 +42,7 @@ def train_step(args):
     args.model = args.model.to(args.device)
     args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
-    args.early_stopping_patience = 3
+    args.early_stopping_patience = 10
     args.patience_counters = [0] * args.hmc_dataset.max_depth
     # args.level_active = [True] * args.hmc_dataset.max_depth
     args.level_active = [level in args.active_levels for level in range(args.max_depth)]
