@@ -85,28 +85,32 @@ class HMCLocalModel(nn.Module):
         self.mum_layers = num_layers
         self.hidden_size = hidden_size
         self.dropout = dropout
-        self.levels = nn.ModuleList()
+        self.levels = nn.ModuleDict()
         self.active_levels = active_levels
         self.max_depth = len(levels_size)
         logging.info(
-            f"HMCLocalModel: input_size={input_size}, levels_size={levels_size}, "
-            f"hidden_size={hidden_size}, num_layers={num_layers}, dropout={dropout}, "
-            f"active_levels={active_levels}"
+            "HMCLocalModel: input_size=%s, levels_size=%s, "
+            "hidden_size=%s, num_layers=%s, dropout=%s, "
+            "active_levels=%s",
+            input_size,
+            levels_size,
+            hidden_size,
+            num_layers,
+            dropout,
+            active_levels,
         )
         for index in active_levels:
-            self.levels.append(
-                BuildClassification(
-                    input_shape=input_size,
-                    hidden_size=hidden_size[index],
-                    output_size=levels_size[index],
-                    nb_layers=num_layers[index],
-                    dropout_rate=dropout[index],
-                )
+            self.levels[str(index)] = BuildClassification(
+                input_shape=input_size,
+                hidden_size=hidden_size[index],
+                output_size=levels_size[index],
+                nb_layers=num_layers[index],
+                dropout_rate=dropout[index],
             )
 
     def forward(self, x):
-        outputs = []
-        for idx, level in enumerate(self.levels):
+        outputs = {}
+        for index, level in self.levels.items():
             local_output = level(x)
-            outputs.append(local_output)
+            outputs[index] = local_output
         return outputs
