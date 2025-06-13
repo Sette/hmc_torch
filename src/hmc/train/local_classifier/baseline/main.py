@@ -137,6 +137,7 @@ def train_local(args):
 
     if args.hpo == "true":
         logging.info("Hyperparameter optimization")
+        args.n_trials = 30
         best_params = optimize_hyperparameters_per_level(args=args)
 
         logging.info(best_params)

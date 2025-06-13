@@ -4,7 +4,7 @@ import optuna
 import torch
 from sklearn.metrics import average_precision_score
 
-from hmc.model.local_classifier.baseline.model import HMCLocalModel
+from hmc.model.local_classifier.baseline.model import HMCLocalModelHPO
 from hmc.train.utils import (
     create_job_id_name,
     show_global_loss,
@@ -95,7 +95,7 @@ def optimize_hyperparameters_per_level(args):
             "active_levels": active_levels_train,
         }
 
-        args.model = HMCLocalModel(**params).to(args.device)
+        args.model = HMCLocalModelHPO(**params).to(args.device)
 
         optimizer = torch.optim.Adam(
             args.model.parameters(),
@@ -132,7 +132,7 @@ def optimize_hyperparameters_per_level(args):
                 args.optimizer.zero_grad()
                 target = targets[level].float()
 
-                loss = args.criterions[level](output, target)
+                loss = args.criterions[level](output[str(level)], target)
                 local_train_losses[level] += loss
 
             # Backward pass (cálculo dos gradientes)
@@ -150,8 +150,8 @@ def optimize_hyperparameters_per_level(args):
             )
 
             logging.info("Trial %d - Epoch %d/%d", trial.number, epoch, args.epochs)
-            show_local_losses(local_train_losses, set=f"Train-{trial.number}")
-            show_global_loss(global_train_loss, set=f"Train-{trial.number}")
+            show_local_losses(local_train_losses, dataset=f"Train-{trial.number}")
+            show_global_loss(global_train_loss, dataset=f"Train-{trial.number}")
 
             if epoch % args.epochs_to_evaluate == 0:
                 local_val_loss, local_val_precision = val_optimizer(args)
@@ -253,17 +253,18 @@ def val_optimizer(args):
     local_val_precision = 0.0
 
     with torch.no_grad():
-        for i, (inputs, targets, _) in enumerate(args.val_loader):
+        for level, (inputs, targets, _) in enumerate(args.val_loader):
             if torch.cuda.is_available():
                 inputs, targets = inputs.to(args.device), [
                     target.to(args.device) for target in targets
                 ]
-            output = args.model(inputs.float())
+            outputs = args.model(inputs.float())
+            output = outputs[str(args.level)]
 
             target = targets[args.level].float()
             local_val_loss += args.criterions[args.level](output, target)
 
-            if i == 0:
+            if level == 0:
                 output_val = output.to("cpu")
                 y_val = target.to("cpu")
             else:

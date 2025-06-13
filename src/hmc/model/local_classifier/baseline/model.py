@@ -114,3 +114,62 @@ class HMCLocalModel(nn.Module):
             local_output = level(x)
             outputs[index] = local_output
         return outputs
+
+
+class HMCLocalModelHPO(nn.Module):
+    def __init__(
+        self,
+        levels_size,
+        input_size=None,
+        hidden_size=None,
+        num_layers=None,
+        dropout=None,
+        active_levels=None,
+    ):
+        super(HMCLocalModelHPO, self).__init__()
+        if not input_size:
+            print("input_size is None, error in HMCLocalClassificationModel")
+            raise ValueError("input_size is None")
+        if not levels_size:
+            print("levels_size is None, error in HMCLocalClassificationModel")
+            raise ValueError("levels_size is None")
+        if not isinstance(levels_size, int):
+            print("levels_size is not an int, error in HMCLocalClassificationModel")
+            raise ValueError("levels_size is not an int")
+        if active_levels is None:
+            print("active_levels is not valid, error in HMCLocalClassificationModel")
+            raise ValueError("active_levels is not valid")
+
+        self.input_size = input_size
+        self.levels_size = levels_size
+        self.mum_layers = num_layers
+        self.hidden_size = hidden_size
+        self.dropout = dropout
+        self.levels = nn.ModuleDict()
+        self.active_levels = active_levels
+        logging.info(
+            "HMCLocalModel: input_size=%s, levels_size=%s, "
+            "hidden_size=%s, num_layers=%s, dropout=%s, "
+            "active_levels=%s",
+            input_size,
+            levels_size,
+            hidden_size,
+            num_layers,
+            dropout,
+            active_levels,
+        )
+        for index in active_levels:
+            self.levels[str(index)] = BuildClassification(
+                input_shape=input_size,
+                hidden_size=hidden_size,
+                output_size=levels_size,
+                nb_layers=num_layers,
+                dropout_rate=dropout,
+            )
+
+    def forward(self, x):
+        outputs = {}
+        for index, level in self.levels.items():
+            local_output = level(x)
+            outputs[index] = local_output
+        return outputs

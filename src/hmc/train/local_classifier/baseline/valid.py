@@ -1,10 +1,7 @@
 import logging
 
 import torch
-from sklearn.metrics import (
-    precision_recall_fscore_support,
-    average_precision_score,
-)
+from sklearn.metrics import precision_recall_fscore_support
 
 
 def valid_step(args):
