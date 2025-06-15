@@ -82,15 +82,16 @@ def train_step(args):
             for optimizer in args.optimizers:
                 optimizer.zero_grad()
             for index in args.active_levels:
-                output = outputs[str(index)]
-                target = targets[index].float()
+                if args.level_active[index]:
+                    output = outputs[str(index)]
+                    target = targets[index].float()
 
-                loss = args.criterions[index](output, target)
-                local_train_losses[index] += loss
+                    loss = args.criterions[index](output, target)
+                    local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
-        for total_loss in local_train_losses:
-            if total_loss > 0:
+        for i, total_loss in enumerate(local_train_losses):
+            if i in args.active_levels and args.level_active[i]:
                 total_loss.backward()
         # args.optimizer.step()
         for optimizer in args.optimizers:
@@ -111,10 +112,8 @@ def train_step(args):
         if epoch % args.epochs_to_evaluate == 0:
             local_val_losses, local_val_score = valid_step(args)
             show_local_losses(local_val_losses, dataset="Val")
-            show_local_score(local_val_score, dataset="Val")
+            # show_local_score(local_val_score, dataset="Val")
 
             if not any(args.level_active):
                 logging.info("All levels have triggered early stopping.")
-                for i in args.active_levels:
-                    args.model.levels[str(i)].load_state_dict(args.best_model[i])
                 break

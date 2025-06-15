@@ -74,26 +74,36 @@ def local_to_global_predictions(local_labels, local_nodes_idx, nodes_idx):
     return global_preds
 
 
+def show_metrics(losses, scores, dataset="Train"):
+    """
+    Show metrics for losses and scores.
+
+    Args:
+        losses (list): List of local losses.
+        scores (dict): Dictionary of local scores.
+        dataset (str): Dataset name (default is "Train").
+    """
+    show_local_losses(losses, dataset)
+    show_local_score(scores, dataset)
+    
+
 def show_local_losses(local_losses, dataset="Train"):
     formatted_string = ""
     for level, local_loss in enumerate(local_losses):
         if local_loss is not None and local_loss != 0.0:
-            formatted_string += "%s Loss %s for level %s // " % (
-                dataset,
-                local_loss,
-                level,
+            formatted_string += "%s Loss %.4f for level %d // " % (
+                dataset, local_loss.item(), level
             )
-
     logging.info(formatted_string)
 
 
 def show_global_loss(global_loss, dataset="Train"):
-    logging.info("Global average loss %s Loss: %s", dataset, global_loss)
+    logging.info("Global average loss %s Loss: %s", dataset, global_loss.item())
 
 
 def show_local_score(local_scores, dataset="Train"):
     formatted_string = ""
-    for level, local_score in enumerate(local_scores):
+    for level, local_score in local_scores.items():
         if local_score is not None and local_score != 0.0:
             formatted_string += "%s Score %s for level %s // " % (
                 dataset,

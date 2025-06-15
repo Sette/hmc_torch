@@ -47,63 +47,80 @@ def valid_step(args):
             outputs = args.model(inputs.float())
 
             for index in args.active_levels:
-                output = outputs[str(index)]
-                target = targets[index].float()
-                loss = args.criterions[index](output, target)
-                local_val_losses[index] += loss
+                if args.level_active[index]:
+                    output = outputs[str(index)]
+                    target = targets[index].float()
+                    loss = args.criterions[index](output, target)
+                    local_val_losses[index] += loss
 
-                if i == 0:
-                    local_outputs[index] = output.to("cpu")
-                    y_val[index] = target.to("cpu")
-                else:
-                    local_outputs[index] = torch.cat(
-                        (local_outputs[index], output.to("cpu")), dim=0
-                    )
-                    y_val[index] = torch.cat((y_val[index], target.to("cpu")), dim=0)
+                    if i == 0:
+                        local_outputs[index] = output.to("cpu")
+                        y_val[index] = target.to("cpu")
+                    else:
+                        local_outputs[index] = torch.cat(
+                            (local_outputs[index], output.to("cpu")), dim=0
+                        )
+                        y_val[index] = torch.cat(
+                            (y_val[index], target.to("cpu")), dim=0
+                        )
     for idx in args.active_levels:
-        y_pred_binary = local_outputs[idx].data > threshold
+        if args.level_active[idx]:
+            y_pred_binary = local_outputs[idx].data > threshold
 
-        score = precision_recall_fscore_support(
-            y_val[idx], y_pred_binary, average="micro"
-        )
-        # local_val_score[idx] = score
-        logging.info(
-            "Level %d: precision=%.4f, recall=%.4f, f1-score=%.4f",
-            idx,
-            score[0],
-            score[1],
-            score[2],
-        )
+            score = precision_recall_fscore_support(
+                y_val[idx], y_pred_binary, average="micro"
+            )
+            # local_val_score[idx] = score
+            logging.info(
+                "Level %d: precision=%.4f, recall=%.4f, f1-score=%.4f",
+                idx,
+                score[0],
+                score[1],
+                score[2],
+            )
 
-        local_val_score[idx] = score[2]
+            local_val_score[idx] = score[2]
 
     local_val_losses = [loss / len(args.val_loader) for loss in local_val_losses]
     logging.info("Levels to evaluate: %s", args.active_levels)
     for i in args.active_levels:
-        if args.best_model[i] is None:
-            args.best_model[i] = args.model.levels[str(i)].state_dict()
-            logging.info("Level %d: initialized best model", i)
-        if round(local_val_score[i], 4) > args.best_val_score[i]:
-            args.best_val_score[i] = round(local_val_score[i], 4)
-            args.best_model[i] = args.model.levels[str(i)].state_dict()
-            args.patience_counters[i] = 0
-            logging.info("Level %d: improved (F1 score=%.4f)", i, local_val_score[i])
-        else:
-            args.patience_counters[i] += 1
-            logging.info(
-                "Level %d: no improvement (patience %d/%d)",
-                i,
-                args.patience_counters[i],
-                args.early_stopping_patience,
-            )
-            if args.patience_counters[i] >= args.early_stopping_patience:
-                args.level_active[i] = False
-                # args.active_levels.remove(i)
+        if args.level_active[i]:
+            if args.best_model[i] is None:
+                args.best_model[i] = args.model.levels[str(i)].state_dict()
+                logging.info("Level %d: initialized best model", i)
+            if (
+                round(local_val_score[i], 4) > args.best_val_score[i]
+                and round(local_val_losses[i].item(), 4) < args.best_val_loss[i]
+            ):
+                # Atualizar o melhor modelo e as melhores métricas
+                args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
+                args.best_val_score[i] = round(local_val_score[i], 4)
+                args.best_model[i] = args.model.levels[str(i)].state_dict()
+                args.patience_counters[i] = 0
                 logging.info(
-                    "🚫 Early stopping triggered for level %d — freezing its parameters",
-                    i,
+                    "Level %d: improved (F1 score=%.4f)", i, local_val_score[i]
                 )
-                # ❄️ Congelar os parâmetros desse nível
-                for param in args.model.levels[str(i)].parameters():
-                    param.requires_grad = False
+            else:
+                if (
+                    round(local_val_score[i], 4) < args.best_val_score[i]  
+                    or round(local_val_losses[i].item(), 4) > args.best_val_loss[i]
+                ):
+                    # Incrementar o contador de paciência
+                    args.patience_counters[i] += 1
+                    logging.info(
+                        "Level %d: no improvement (patience %d/%d)",
+                        i,
+                        args.patience_counters[i],
+                        args.early_stopping_patience,
+                    )
+                    if args.patience_counters[i] >= args.early_stopping_patience:
+                        args.level_active[i] = False
+                        # args.active_levels.remove(i)
+                        logging.info(
+                            "🚫 Early stopping triggered for level %d — freezing its parameters",
+                            i,
+                        )
+                        # ❄️ Congelar os parâmetros desse nível
+                        for param in args.model.levels[str(i)].parameters():
+                            param.requires_grad = False
     return local_val_losses, local_val_score

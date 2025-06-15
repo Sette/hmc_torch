@@ -156,11 +156,13 @@ def optimize_hyperparameters_per_level(args):
 
             if epoch % args.epochs_to_evaluate == 0:
                 local_val_loss, local_val_f1 = val_optimizer(args)
-
-                if local_val_f1 > best_val_f1:
+                if local_val_f1 > best_val_f1 and local_val_loss < best_val_loss:
                     best_val_f1 = local_val_f1
+                    best_val_loss = local_val_loss
+                    patience_counter = patience
                 else:
-                    patience_counter -= 1
+                    if local_val_f1 < best_val_f1 or local_val_loss > best_val_loss:
+                        patience_counter -= 1
 
                 if patience_counter == 0:
                     logging.info(
@@ -174,9 +176,7 @@ def optimize_hyperparameters_per_level(args):
                 trial.report(local_val_f1, step=epoch)
 
                 logging.info("Local loss %d: %f", trial.number, local_val_loss)
-                logging.info(
-                    "Local F1 %d: %f", trial.number, local_val_f1
-                )
+                logging.info("Local F1 %d: %f", trial.number, local_val_f1)
 
                 # Early stopping (pruning)
                 if trial.should_prune():

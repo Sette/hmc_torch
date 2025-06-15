@@ -60,7 +60,7 @@ def test_step(args):
         key: torch.cat(outputs, dim=0) for key, outputs in local_outputs.items()
     }
     # Get local scores
-    local_test_score = {level: None for _, level in enumerate(args.active_levels)}
+    local_test_score = {level: {'f1score': None, 'precision': None, 'recall': None} for _, level in enumerate(args.active_levels)}
 
     logging.info("Evaluating %d active levels...", len(args.active_levels))
     for idx in args.active_levels:
@@ -68,15 +68,16 @@ def test_step(args):
 
         # y_pred_binary = (local_outputs[idx] > threshold).astype(int)
 
-        # score = precision_recall_fscore_support(
-        #     local_inputs[idx], y_pred_binary, average="micro"
-        # )
-
-        score = average_precision_score(
+        score = precision_recall_fscore_support(
             local_inputs[idx], y_pred_binary, average="micro"
         )
 
-        local_test_score[idx] = score
+        # score = average_precision_score(
+        #     local_inputs[idx], y_pred_binary, average="micro"
+        # )
+        local_test_score[idx]['precision'] = score[0]  # Precision    
+        local_test_score[idx]['recall'] = score[1]     # Recall
+        local_test_score[idx]['f1score'] = score[2]   # F1-score
 
     logging.info("Local test score: %s", str(local_test_score))
 
@@ -90,10 +91,10 @@ def test_step(args):
     )
 
     # Save the trained model
-    torch.save(
-        args.model.state_dict(),
-        f"results/train/{args.dataset_name}-{job_id}-state_dict.pt",
-    )
+    # torch.save(
+    #     args.model.state_dict(),
+    #     f"results/train/{args.dataset_name}-{job_id}-state_dict.pt",
+    # )
     # args.model.save(f"results/train/{args.dataset_name}-{job_id}.pt")
 
     # Concat global targets
