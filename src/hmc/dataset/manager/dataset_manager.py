@@ -269,7 +269,7 @@ def initialize_dataset_experiments(
     - HMCDatasetManager: Initialized dataset manager.
     """
     # Load dataset paths
-    datasets = get_dataset_paths(dataset_type=dataset_type)
+    datasets = get_dataset_paths(dataset_path = './data', dataset_type=dataset_type)
 
     # Validate if the dataset exists
     if name not in datasets:
