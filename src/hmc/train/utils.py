@@ -1,6 +1,7 @@
 import json
-from datetime import datetime
 import logging
+from datetime import datetime
+
 import numpy as np
 
 
@@ -85,14 +86,16 @@ def show_metrics(losses, scores, dataset="Train"):
     """
     show_local_losses(losses, dataset)
     show_local_score(scores, dataset)
-    
+
 
 def show_local_losses(local_losses, dataset="Train"):
     formatted_string = ""
     for level, local_loss in enumerate(local_losses):
         if local_loss is not None and local_loss != 0.0:
             formatted_string += "%s Loss %.4f for level %d // " % (
-                dataset, local_loss.item(), level
+                dataset,
+                local_loss.item(),
+                level,
             )
     logging.info(formatted_string)
 

@@ -1,15 +1,16 @@
 import logging
 import sys
+
 import optuna
 import torch
-from sklearn.metrics import precision_recall_fscore_support, average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_fscore_support
 
 from hmc.model.local_classifier.baseline.model import HMCLocalModelHPO
 from hmc.train.utils import (
     create_job_id_name,
+    save_dict_to_json,
     show_global_loss,
     show_local_losses,
-    save_dict_to_json,
 )
 from hmc.utils.dir import create_dir
 
@@ -156,12 +157,18 @@ def optimize_hyperparameters_per_level(args):
 
             if epoch % args.epochs_to_evaluate == 0:
                 local_val_loss, local_val_f1 = val_optimizer(args)
-                if round(local_val_f1, 4) > best_val_f1 and local_val_loss < best_val_loss:
+                if (
+                    round(local_val_f1, 4) > best_val_f1
+                    and local_val_loss < best_val_loss
+                ):
                     best_val_f1 = round(local_val_f1, 4)
                     best_val_loss = local_val_loss
                     patience_counter = patience
                 else:
-                    if round(local_val_f1, 4) < best_val_f1 or local_val_loss > best_val_loss:
+                    if (
+                        round(local_val_f1, 4) < best_val_f1
+                        or local_val_loss > best_val_loss
+                    ):
                         patience_counter -= 1
 
                 if patience_counter == 0:

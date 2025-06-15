@@ -102,7 +102,7 @@ def valid_step(args):
                 )
             else:
                 if (
-                    round(local_val_score[i], 4) < args.best_val_score[i]  
+                    round(local_val_score[i], 4) < args.best_val_score[i]
                     or round(local_val_losses[i].item(), 4) > args.best_val_loss[i]
                 ):
                     # Incrementar o contador de paciência

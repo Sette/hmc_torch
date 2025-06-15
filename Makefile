@@ -8,10 +8,10 @@ lint-check:
 	@echo "--> Running linter check"
 	autopep8 --in-place --recursive src
 	flake8 **/*.py
-	black --check src
-	pylama src
-	isort -c src
-	pylint $(git ls-files '*.py')
+	black --check **/*.py
+	pylama **/*.py
+	isort -c **/*.py
+	pylint **/*.py
 
 pre-commit:
 	@echo "--> Running pre-commit"
@@ -19,9 +19,9 @@ pre-commit:
 
 lint:
 	@echo "--> Running linter"
-	black src
-	flake8 src
-	isort src
+	black **/*.py
+	flake8 **/*.py
+	isort **/*.py
 
 dvc:
 	@dvc pull

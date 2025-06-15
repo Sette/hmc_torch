@@ -1,6 +1,6 @@
-import torch.nn as nn
-
 import logging
+
+import torch.nn as nn
 
 
 def transform_predictions(predictions):

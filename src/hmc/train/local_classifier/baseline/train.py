@@ -1,13 +1,13 @@
 import logging
+
 import torch
 
+from hmc.train.local_classifier.baseline.valid import valid_step
 from hmc.train.utils import (
     show_global_loss,
     show_local_losses,
     show_local_score,
 )
-
-from hmc.train.local_classifier.baseline.valid import valid_step
 
 
 def train_step(args):
