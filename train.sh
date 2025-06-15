@@ -94,7 +94,7 @@ done
                 --seed $SEED \
                 --output_path $OUTPUT_PATH \
                 --method $METHOD \
-                --hpo $HPO" 
+                --hpo $HPO"
 
 if [ "$ACTIVE_LEVELS" ]; then
     cmd+=" --active_levels $ACTIVE_LEVELS"
