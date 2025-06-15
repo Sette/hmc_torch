@@ -89,7 +89,7 @@ def valid_step(args):
                 args.best_model[i] = args.model.levels[str(i)].state_dict()
                 logging.info("Level %d: initialized best model", i)
             if (
-                round(local_val_score[i], 4) >= args.best_val_score[i]
+                round(local_val_score[i], 4) > args.best_val_score[i]
                 and round(local_val_losses[i].item(), 4) < args.best_val_loss[i]
             ):
                 # Atualizar o melhor modelo e as melhores métricas
