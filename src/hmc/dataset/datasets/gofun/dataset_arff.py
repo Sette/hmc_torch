@@ -24,6 +24,7 @@ class HMCDatasetArff:
             self.Y,
             self.Y_local,
             self.A,
+            self.edges_matrix,
             self.terms,
             self.g,
             self.levels,
@@ -52,7 +53,11 @@ def parse_arff(arff_file, is_go=False):
         d = []
         cats_lens = []
         all_terms = []
-        for num_line, l in enumerate(f):
+        max_depth = 0
+        local_nodes_idx = {}
+        nodes_idx = {}
+        nodes = []
+        for _, l in enumerate(f):
             if l.startswith("@ATTRIBUTE"):
                 if l.startswith("@ATTRIBUTE class"):
                     h = l.split("hierarchical")[1].strip()
@@ -94,7 +99,7 @@ def parse_arff(arff_file, is_go=False):
                         for idx, level_nodes in levels.items()
                     }
                 else:
-                    _, f_name, f_type = l.split()
+                    _, _, f_type = l.split()
 
                     if f_type == "numeric" or f_type == "NUMERIC":
                         d.append([])
@@ -161,12 +166,19 @@ def parse_arff(arff_file, is_go=False):
                 Y_local.append([np.stack(y) for y in y_local_])
         X = np.array(X)
         Y = np.stack(Y)
+        edges_matrix = [
+            np.array(
+                nx.to_numpy_array(g, nodelist=level_nodes)
+                for level_nodes in levels.values()
+            )
+        ]
 
         return (
             X,
             Y,
             Y_local,
             np.array(nx.to_numpy_array(g, nodelist=nodes)),
+            edges_matrix,
             nodes,
             g,
             levels,
