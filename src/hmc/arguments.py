@@ -102,7 +102,7 @@ def get_parser():
         "--method",
         type=str,
         default="global",
-        choices=["global", "local", "globalLM", "global_baseline"],
+        choices=["global", "local", "globalLM", "global_baseline", "local_constrained"],
         metavar="METHOD",
         required=False,
         help="Method type to use.",

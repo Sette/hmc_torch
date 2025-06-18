@@ -2,7 +2,7 @@ import os
 import random
 import sys
 from pathlib import Path
-
+import logging
 import numpy as np
 import torch
 
@@ -12,6 +12,14 @@ from hmc.train.global_classifier.constrained.train_global import train_global
 from hmc.train.global_classifier.constrained.train_globalLM import train_globalLM
 from hmc.train.local_classifier.baseline.main import train_local
 from hmc.utils.dir import create_job_id
+
+# Set a logger config
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 

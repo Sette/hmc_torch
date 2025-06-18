@@ -4,9 +4,15 @@ from itertools import chain
 import keras
 import networkx as nx
 import numpy as np
-
+import logging
 from hmc.dataset.datasets.gofun import to_skip
 
+# Set a logger config
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
 
 def get_depth_by_root(g_t, t, roots):
     for root in roots:
@@ -166,12 +172,15 @@ def parse_arff(arff_file, is_go=False):
                 Y_local.append([np.stack(y) for y in y_local_])
         X = np.array(X)
         Y = np.stack(Y)
-        edges_matrix = [
-            np.array(
-                nx.to_numpy_array(g, nodelist=level_nodes)
-                for level_nodes in levels.values()
-            )
-        ]
+        edges_matrix = {}
+        for idx, level_nodes in enumerate(levels.values()):
+            if idx != 0:
+                level_nodes = [node.replace("/", ".") for node in level_nodes]
+                edges_matrix[idx] = np.array(nx.to_numpy_array(g, nodelist=level_nodes))
+        
+        
+        logger.info("Parsed ARFF file: %s", arff_file)
+        logger.info("Number of matrix: %d", len(edges_matrix))
 
         return (
             X,

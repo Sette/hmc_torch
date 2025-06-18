@@ -3,6 +3,9 @@ import logging
 import torch.nn as nn
 
 
+from hmc.model.local_classifier.constrained.utils import get_constr_out
+
+
 def transform_predictions(predictions):
     transformed = []
     # Loop through each index to form examples with the first element from each level

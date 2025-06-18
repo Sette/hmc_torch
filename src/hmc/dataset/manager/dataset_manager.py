@@ -50,7 +50,8 @@ class HMCDatasetManager:
             {},
             {},
         )
-        self.labels, self.roots, self.nodes, self.g_t, self.A, self.edges_matrix = (
+        self.labels, self.roots, self.nodes, self.g_t, self.A, self.edges_matrix, self.all_matrix_r = (
+            [],
             [],
             [],
             [],
@@ -166,10 +167,13 @@ class HMCDatasetManager:
     def compute_matrix_R_local(self):
         # Compute the list with local matrix of ancestors R, named matrix_r
         # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        all_matrix_r = []
-        for edges in self.edges_matrix:
+        all_matrix_r = {}
+        for idx, edges in self.edges_matrix.items():
             matrix_r = self.compute_matrix_R(edges)
-            all_matrix_r.append(matrix_r)
+            logger.info(
+                "Computed matrix R for level %d with shape %s", idx, matrix_r.shape
+            )
+            all_matrix_r[idx] = matrix_r
         return all_matrix_r
 
     def transform_labels(self, dataset_labels):

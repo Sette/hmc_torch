@@ -9,6 +9,15 @@ from hmc.train.utils import (
     show_local_score,
 )
 
+from hmc.model.local_classifier.constrained.utils import get_constr_out
+
+# Set a logger config
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
+
 
 def train_step(args):
     """
@@ -85,8 +94,17 @@ def train_step(args):
                 if args.level_active[index]:
                     output = outputs[str(index)]
                     target = targets[index].float()
-
-                    loss = args.criterions[index](output, target)
+                    
+                    # MCLoss
+                    if index == 0:
+                        loss = args.criterions[index](output, target)
+                    else:
+                        R = args.hmc_dataset.all_matrix_r[index].to(args.device)
+                        constr_output = get_constr_out(output, R)
+                        train_output = target * output.double()
+                        train_output = get_constr_out(train_output, R)
+                        train_output = (1 - target) * constr_output.double() + target * train_output
+                        loss = args.criterions[index](train_output, target.double())
                     local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
