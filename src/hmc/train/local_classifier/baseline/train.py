@@ -54,15 +54,10 @@ def train_step(args):
     args.best_model = [None] * args.max_depth
     logging.info("Best val loss created %s", args.best_val_loss)
 
-    optimizers = [
-        torch.optim.Adam(
+    args.optimizer = torch.optim.Adam(
             model.parameters(),
-            lr=args.lr_values[int(idx)],
-            weight_decay=args.weight_decay_values[int(idx)],
-        )
-        for idx, model in args.model.levels.items()
-    ]
-    args.optimizers = optimizers
+            lr=args.lr_values[0],
+            weight_decay=args.weight_decay_values[0])
 
     for epoch in range(1, args.epochs + 1):
         args.model.train()
@@ -93,9 +88,7 @@ def train_step(args):
         for i, total_loss in enumerate(local_train_losses):
             if i in args.active_levels and args.level_active[i]:
                 total_loss.backward()
-        # args.optimizer.step()
-        for optimizer in args.optimizers:
-            optimizer.step()
+        args.optimizer.step()
 
         local_train_losses = [
             loss / len(args.train_loader) for loss in local_train_losses
