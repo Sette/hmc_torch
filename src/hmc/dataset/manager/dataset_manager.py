@@ -11,12 +11,11 @@ from hmc.dataset.datasets.gofun.dataset_csv import HMCDatasetCsv
 from hmc.dataset.datasets.gofun.dataset_torch import HMCDatasetTorch
 from hmc.utils.dir import __load_json__
 
-# Configurar o logger
+# Set a logger config
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-# Criar um logger
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +35,7 @@ class HMCDatasetManager:
 
     """
 
-    def __init__(self, dataset, dataset_type="csv", device="cpu", is_global=False):
+    def __init__(self, dataset, dataset_type="arff", device="cpu", is_global=False):
         # Extract dataset paths
         self.test, self.train, self.valid, self.to_eval, self.max_depth = (
             None,
@@ -51,7 +50,15 @@ class HMCDatasetManager:
             {},
             {},
         )
-        self.labels, self.roots, self.nodes, self.g_t, self.A = [], [], [], [], []
+        self.labels, self.roots, self.nodes, self.g_t, self.A, self.edges_matrix, self.all_matrix_r = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
         self.to_skip = to_skip
         # Initialize attributes
         self.is_global = is_global
@@ -72,7 +79,7 @@ class HMCDatasetManager:
             # Load hierarchical structure
             self.load_structure_from_json(self.labels_file)
 
-        logger.info(f"Loading dataset from {self.train_file}")
+        logger.info("Loading dataset from %s", self.train_file)
 
         if dataset_type == "csv":
             self.load_csv_data()
@@ -141,13 +148,13 @@ class HMCDatasetManager:
         for idx, level_nodes in self.levels.items():
             self.local_nodes_idx[idx] = {node: i for i, node in enumerate(level_nodes)}
 
-    def compute_matrix_R(self):
+    def compute_matrix_R(self, edges):
         # Compute matrix of ancestors R, named matrix_r
         # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        matrix_r = np.zeros(self.A.shape)
+        matrix_r = np.zeros(edges.shape)
         np.fill_diagonal(matrix_r, 1)
-        g = nx.DiGraph(self.A)
-        for i in range(len(self.A)):
+        g = nx.DiGraph(edges)
+        for i in range(len(edges)):
             descendants = list(nx.descendants(g, i))
             if descendants:
                 matrix_r[i, descendants] = 1
@@ -156,6 +163,18 @@ class HMCDatasetManager:
         matrix_r = matrix_r.transpose(1, 0)
         matrix_r = matrix_r.unsqueeze(0)
         return matrix_r
+
+    def compute_matrix_R_local(self):
+        # Compute the list with local matrix of ancestors R, named matrix_r
+        # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
+        all_matrix_r = {}
+        for idx, edges in self.edges_matrix.items():
+            matrix_r = self.compute_matrix_R(edges)
+            logger.info(
+                "Computed matrix R for level %d with shape %s", idx, matrix_r.shape
+            )
+            all_matrix_r[idx] = matrix_r
+        return all_matrix_r
 
     def transform_labels(self, dataset_labels):
         y_local_ = []
@@ -204,15 +223,15 @@ class HMCDatasetManager:
         self.valid = HMCDatasetCsv(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetCsv(self.test_file, is_go=self.is_go)
 
-        dataset_labels = self.train.df.labels.values
+        dataset_labels = self.train.df.categories.values
         logger.info("Transforming train labels")
         self.train.set_y(self.transform_labels(dataset_labels))
 
-        dataset_labels = self.valid.df.labels.values
+        dataset_labels = self.valid.df.categories.values
         logger.info("Transforming valid labels")
         self.valid.set_y(self.transform_labels(dataset_labels))
 
-        dataset_labels = self.test.df.labels.values
+        dataset_labels = self.test.df.categories.values
         logger.info("Transforming test labels")
         self.test.set_y(self.transform_labels(dataset_labels))
 
@@ -238,6 +257,8 @@ class HMCDatasetManager:
         self.valid = HMCDatasetArff(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetArff(self.test_file, is_go=self.is_go)
         self.A = self.train.A
+        self.edges_matrix = self.train.edges_matrix
+        self.all_matrix_r = self.compute_matrix_R_local()
         self.to_eval = self.train.to_eval
         self.nodes = self.train.g.nodes()
         self.local_nodes_idx = self.train.local_nodes_idx
@@ -269,7 +290,7 @@ def initialize_dataset_experiments(
     - HMCDatasetManager: Initialized dataset manager.
     """
     # Load dataset paths
-    datasets = get_dataset_paths(dataset_type=dataset_type)
+    datasets = get_dataset_paths(dataset_path="./data", dataset_type=dataset_type)
 
     # Validate if the dataset exists
     if name not in datasets:

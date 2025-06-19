@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export CUDA_VISIBLE_DEVICES=0
+export CUDA_LAUNCH_BLOCKING=1
 
 # Lista de datasets
 datasets=('cellcycle_GO' 'derisi_GO' 'eisen_GO' 'expr_GO' 'gasch1_GO'
@@ -8,20 +10,25 @@ datasets=('cellcycle_GO' 'derisi_GO' 'eisen_GO' 'expr_GO' 'gasch1_GO'
 
 # Definição de valores padrão para os parâmetros
 DATASET="seq_FUN"
-DATASET_PATH="/home/bruno/storage/data/datasets"
+DATASET_PATH="./data"
 BATCH_SIZE=4
 NON_LIN="relu"
-DEVICE="cuda"
-EPOCHS=400
-OUTPUT_PATH="/home/bruno/storage/models/gofun"
+DEVICE="cpu"
+EPOCHS=2000
+OUTPUT_PATH="results"
 METHOD="local"
+SEED=0
+DATASET_TYPE="arff"
 HPO="false"
-HIDDEN_DIMS="128 64 64 64 256 128"
-LR_VALUES="0.00010794368379687011 2.178703230034242e-06 7.460962089501645e-06 1.2134579389248778e-05 7.988004821793316e-05 9.743887160679586e-06"
-DROPOUT_VALUES="0.740386914297677 0.5500644363368916 0.753285175114529 0.4901667669873963 0.4134921804354519 0.4432743726722958"
-NUM_LAYERS_VALUES="3 1 2 2 3 2"
-WEIGHT_DECAY_VALUES="2.2136082418391805e-06 0.005034954154454949 8.445576937834946e-06 0.0001615124248445063 2.765823670906765e-06 2.7622113077056268e-06"
+# ACTIVE_LEVELS="0"
+HIDDEN_DIMS="356 451 184 300 216 253"
+LR_VALUES="0.00044766011460352974 0.00014979270540666786 0.000979239810055003 0.00011945129570958105 1.0158886816263624e-06 0.0003857168137677134"
+DROPOUT_VALUES="0.5423049728240137 0.6259684313528631 0.5637537833386804 0.7472570730186732 0.4045542102539288 0.4248880393091625"
+NUM_LAYERS_VALUES="1 1 1 1 3 1"
+WEIGHT_DECAY_VALUES="2.5275292389739167e-06 0.008477855117302344 0.008931270081837467 8.049371645772185e-05 1.360066713089424e-05 0.004867224985511117"
 export PYTHONPATH=src
+export DATASET_PATH
+export OUTPUT_PATH
 
 # Function to display help
 usage() {
@@ -30,7 +37,12 @@ usage() {
     echo "Available options:"
     echo "  --dataset <name>          Dataset name (default: $DATASET)"
     echo "  --dataset_path <path>     Dataset path (default: $DATASET_PATH)"
+    echo "  --seed <num>              Random seed (default: $SEED)"
+    echo "  --dataset_type <type>     Dataset type (default: $DATASET_TYPE)"
     echo "  --batch_size <num>        Batch size (default: $BATCH_SIZE)"
+    echo "  --lr_values <values>      Learning rates"
+    echo "  --dropout <values>        Dropout rates (default: $DROPOUT_VALUES)"
+    echo "  --hidden_dims <values>    Hidden dimensions (default: $HIDDEN_DIMS)"
     echo "  --dropout_values <values> Dropout rates"
     echo "  --hidden_dims <values>    Hidden dimensions"
     echo "  --num_layers_values <values> Number of layers"
@@ -41,6 +53,7 @@ usage() {
     echo "  --output_path <path>      Output path for models (default: $OUTPUT_PATH)"
     echo "  --method <method>         Training method (default: $METHOD)"
     echo "  --hpo <true/false>        Hyperparameter optimization (default: $HPO)"
+    echo "  --active_levels <num>     Number of active levels"
     echo "  --help                    Display this message and exit"
     exit 0
 }
@@ -50,6 +63,8 @@ while [ "$#" -gt 0 ]; do
     case $1 in
         --dataset) DATASET="$2"; shift ;;
         --dataset_path) DATASET_PATH="$2"; shift ;;
+        --seed) SEED="$2"; shift ;;
+        --dataset_type) DATASET_TYPE="$2"; shift ;;
         --batch_size) BATCH_SIZE="$2"; shift ;;
         --lr_values) LR_VALUES=($2); shift ;;
         --dropout_values) DROPOUT_VALUES=($2); shift ;;
@@ -62,60 +77,17 @@ while [ "$#" -gt 0 ]; do
         --output_path) OUTPUT_PATH="$2"; shift ;;
         --method) METHOD="$2"; shift ;;
         --hpo) HPO="$2"; shift ;;
+        --active_levels) ACTIVE_LEVELS=($2); shift ;;
         --help) usage ;;
         *) echo "Invalid option: $1"; usage ;;
     esac
     shift
 done
 
-if [ "$DATASET" = "all" ]; then
-    # Loop sobre os datasets
-    # Número máximo de processos em paralelo
-    MAX_JOBS=6
-    current_jobs=0
-    for dataset in "${datasets[@]}"; do
-        # Loop para executar com diferentes seeds
-        for SEED in 0
-        do
-            echo "Running with arguments: --dataset $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr_values $LR_VALUES --dropout $DROPOUT_VALUES --hidden_dims $HIDDEN_DIMS --num_layers_values $NUM_LAYERS_VALUES --weight_decay_values $WEIGHT_DECAY_VALUES --non_lin $NON_LIN --device $DEVICE --epochs $EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
-            # Controle de processos simultâneos
-            PYTHONPATH=src poetry run python -m hmc.train.main \
-                --datasets "$dataset" \
-                --dataset_path "$DATASET_PATH" \
-                --batch_size "$BATCH_SIZE" \
-                --lr_values "${LR_VALUES[@]}" \
-                --dropout_values "${DROPOUT_VALUES[@]}" \
-                --hidden_dims "${HIDDEN_DIMS[@]}" \
-                --num_layers_values "${NUM_LAYERS_VALUES[@]}" \
-                --weight_decay_values "${WEIGHT_DECAY_VALUES[@]}" \
-                --non_lin "$NON_LIN" \
-                --device "$DEVICE" \
-                --epochs "$EPOCHS" \
-                --seed "$SEED" \
-                --output_path "$OUTPUT_PATH" \
-                --method "$METHOD" \
-                --hpo "$HPO" &  # Executa em segundo plano
-
-
-            ((current_jobs++))
-
-            # Se o número de processos em execução atingir MAX_JOBS, esperar antes de continuar
-            if (( current_jobs >= MAX_JOBS )); then
-                wait -n  # Aguarda pelo menos um processo terminar antes de continuar
-                ((current_jobs--))  # Reduz o contador de processos em execução
-            fi
-
-        done
-    done
-else
-    for SEED in 0
-        do
-            echo "Running with arguments: --dataset $DATASET --dataset_path $DATASET_PATH --batch_size $BATCH_SIZE --lr $LR --dropout_values $DROPOUT_VALUES --hidden_dims $HIDDEN_DIMS --num_layers_values $NUM_LAYERS_VALUES --weight_decay_values $WEIGHT_DECAY_VALUES --non_lin $NON_LIN --device $DEVICE --epochs $EPOCHS --seed $SEED --output_path $OUTPUT_PATH --method $METHOD"
-            # Controle de processos simultâneos
-            cmd="poetry run python -m hmc.train.main \
-                --datasets $DATASET \
+ cmd="poetry run python -m hmc.train.main \
                 --dataset_path $DATASET_PATH \
                 --batch_size $BATCH_SIZE \
+                --dataset_type $DATASET_TYPE \
                 --non_lin $NON_LIN \
                 --device $DEVICE \
                 --epochs $EPOCHS \
@@ -123,19 +95,45 @@ else
                 --output_path $OUTPUT_PATH \
                 --method $METHOD \
                 --hpo $HPO"
-            if [ "$HPO" = "false" ]; then
-                cmd+=" --lr_values ${LR_VALUES[@]} \
-                        --dropout_values ${DROPOUT_VALUES[@]} \
-                        --hidden_dims ${HIDDEN_DIMS[@]} \
-                        --num_layers_values ${NUM_LAYERS_VALUES[@]} \
-                        --weight_decay_values ${WEIGHT_DECAY_VALUES[@]}"
-            fi
 
-            $cmd &  # Executa em segundo plano
-    done
+if [ "$ACTIVE_LEVELS" ]; then
+    cmd+=" --active_levels $ACTIVE_LEVELS"
 fi
+
+
+if [ "$HPO" = "false" ] && { [ "$METHOD" = "local" ] || [ "$METHOD" = "local_constrained" ]; }; then
+        cmd+=" \
+            --lr_values ${LR_VALUES[@]} \
+            --dropout_values ${DROPOUT_VALUES[@]} \
+            --hidden_dims ${HIDDEN_DIMS[@]} \
+            --num_layers_values ${NUM_LAYERS_VALUES[@]} \
+            --weight_decay_values ${WEIGHT_DECAY_VALUES[@]}"
+fi
+if [ "$DATASET" = "all" ]; then
+    MAX_JOBS=6
+    current_jobs=0
+
+    for dataset in "${datasets[@]}"; do
+        cmd="$cmd --datasets $dataset"
+
+        echo "Running: $cmd"
+        $cmd &
+
+        current_jobs=$((current_jobs + 1))
+
+        if (( current_jobs >= MAX_JOBS )); then
+            wait -n
+            current_jobs=$((current_jobs - 1))
+        fi
+    done
+else
+    cmd="$cmd --datasets $DATASET"
+
+    echo "Running: $cmd"
+    $cmd &
+fi
+
 TRAIN_PID=$!
-# Aguarda a execução de todos os processos restantes
 trap "kill $TRAIN_PID" SIGINT SIGTERM
 wait
 

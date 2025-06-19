@@ -63,4 +63,8 @@ time_elapsed = time_end - time_start
 print(".......................................")
 
 string_format = "[{}] Predict finished at {} / elapsed time {}s"
-print(string_format.format(id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()))
+print(
+    string_format.format(
+        id, time_end.strftime("%H:%M:%S"), time_elapsed.total_seconds()
+    )
+)
