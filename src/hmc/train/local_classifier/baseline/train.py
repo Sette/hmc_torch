@@ -55,9 +55,10 @@ def train_step(args):
     logging.info("Best val loss created %s", args.best_val_loss)
 
     args.optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=args.lr_values[0],
-            weight_decay=args.weight_decay_values[0])
+        args.model.parameters(),
+        lr=args.lr_values[0],
+        weight_decay=args.weight_decay_values[0],
+    )
 
     for epoch in range(1, args.epochs + 1):
         args.model.train()
@@ -73,9 +74,8 @@ def train_step(args):
             outputs = args.model(inputs.float())
 
             # Zerar os gradientes antes de cada batch
-            # args.optimizer.zero_grad()
-            for optimizer in args.optimizers:
-                optimizer.zero_grad()
+            args.optimizer.zero_grad()
+
             for index in args.active_levels:
                 if args.level_active[index]:
                     output = outputs[str(index)]
