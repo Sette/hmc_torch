@@ -76,15 +76,19 @@ class HMCLocalModel(nn.Module):
         if not isinstance(levels_size, dict):
             print("levels_size is not a dict, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is not a dict")
+<<<<<<< HEAD
         if active_levels is None:
             print("active_levels is not valid, error in HMCLocalClassificationModel")
             raise ValueError("active_levels is not valid")
+=======
+>>>>>>> main
 
         self.input_size = input_size
         self.levels_size = levels_size
         self.mum_layers = num_layers
         self.hidden_size = hidden_size
         self.dropout = dropout
+<<<<<<< HEAD
         self.levels = nn.ModuleDict()
         self.active_levels = active_levels
         self.max_depth = len(levels_size)
@@ -173,3 +177,39 @@ class HMCLocalModelHPO(nn.Module):
             local_output = level(x)
             outputs[index] = local_output
         return outputs
+=======
+        self.levels = nn.ModuleList()
+        self.max_depth = len(levels_size)
+        self.active_levels = active_levels
+
+        if active_levels is not None:
+            self.model = BuildClassification(
+                input_shape=input_size,
+                hidden_size=hidden_size[active_levels[0]],
+                output_size=levels_size[active_levels[0]],
+                nb_layers=num_layers[active_levels[0]],
+                dropout_rate=dropout[active_levels[0]],
+            )
+        else:
+            for index, level_size in enumerate(levels_size.values()):
+                self.levels.append(
+                    BuildClassification(
+                        input_shape=input_size,
+                        hidden_size=hidden_size[index],
+                        output_size=level_size,
+                        nb_layers=num_layers[index],
+                        dropout_rate=dropout[index],
+                    )
+                )
+
+    def forward(self, x):
+        outputs = []
+        if self.active_levels is not None:
+            output = self.model(x)
+            return output
+        else:
+            for idx, level in enumerate(self.levels):
+                local_output = level(x)
+                outputs.append(local_output)
+            return outputs
+>>>>>>> main
