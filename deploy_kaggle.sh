@@ -140,7 +140,7 @@ else
     ssh "$REMOTE_HOST" "
         cd $REMOTE_PATH &&
         source .venv/bin/activate &&
-        chmod +x $SCRIPT_TO_RUN && ./$SCRIPT_TO_RUN --device cuda --dataset_path /kaggle/input/gene-ontology-original \
+        chmod +x $SCRIPT_TO_RUN && ./$SCRIPT_TO_RUN --device cuda --dataset_path /kaggle/input/gene-ontology-original --method local_constrained \
     "
     echo "Treinamento terminado sem tmux."
 fi
