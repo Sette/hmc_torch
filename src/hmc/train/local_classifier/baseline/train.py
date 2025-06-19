@@ -78,9 +78,9 @@ def train_step(args):
             for index in args.active_levels:
                 if args.level_active[index]:
                     output = outputs[str(index)]
-                    target = targets[index].float()
+                    target = targets[index]
 
-                    loss = args.criterions[index](output, target)
+                    loss = args.criterions[index](output, target.double())
                     local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
