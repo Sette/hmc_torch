@@ -110,7 +110,7 @@ if [ "$INSTALL_CHOICE" = "y" ]; then
         source .venv/bin/activate &&
         poetry source add pytorch --priority=explicit &&
         poetry source remove pytorch-cpu || true &&
-        poetry install \
+        poetry install --no-root \
     "
 else
     echo "Pulando instalação de dependências."
