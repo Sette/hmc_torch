@@ -272,6 +272,7 @@ class HMCDatasetManager:
         self.A = self.train.A
         self.edges_matrix_dict = self.train.edges_matrix_dict
         self.compute_matrix_R_local()
+        logger.info(self.all_matrix_r)
         self.to_eval = self.train.to_eval
         self.nodes = self.train.g.nodes()
         self.local_nodes_idx = self.train.local_nodes_idx
