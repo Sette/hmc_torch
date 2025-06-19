@@ -15,6 +15,10 @@ from hmc.model.global_classifier.constrained.model import (
 )
 from hmc.utils.dir import create_dir
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> main
 def train_global(dataset_name, args):
     print(".......................................")
     print("Experiment with {} dataset ".format(dataset_name))
