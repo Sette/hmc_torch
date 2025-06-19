@@ -2,7 +2,7 @@ import os
 import random
 import sys
 from pathlib import Path
-
+import logging
 import numpy as np
 import torch
 
@@ -10,8 +10,26 @@ from hmc.arguments import get_parser
 from hmc.train.global_classifier.baseline.train_global import train_global_baseline
 from hmc.train.global_classifier.constrained.train_global import train_global
 from hmc.train.global_classifier.constrained.train_globalLM import train_globalLM
-from hmc.train.local_classifier.baseline.main import train_local
+
 from hmc.utils.dir import create_job_id
+
+# Set a logger config
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
+
+import numpy as np
+import torch
+
+from hmc.model.arguments import get_parser
+from hmc.train.train_global import train_global
+from hmc.train.train_globalLM import train_globalLM
+from hmc.train.train_global_baseline import train_global_baseline
+from hmc.train.train_local import train_local
+from hmc.utils.dir import create_job_id
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
@@ -197,6 +215,11 @@ def main():
             train_global(dataset_name, args)
 
         if args.method == "local":
+            from hmc.train.local_classifier.baseline.main import train_local
+            train_local(args)
+
+        if args.method == "local_constrained":
+            from hmc.train.local_classifier.constrained.main import train_local
             train_local(args)
 
         if args.method == "globalLM":
