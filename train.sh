@@ -10,7 +10,7 @@ datasets=('cellcycle_GO' 'derisi_GO' 'eisen_GO' 'expr_GO' 'gasch1_GO'
 
 # Definição de valores padrão para os parâmetros
 DATASET="seq_FUN"
-DATASET_PATH="./data"
+# DATASET_PATH="./data"
 BATCH_SIZE=4
 NON_LIN="relu"
 DEVICE="cpu"
