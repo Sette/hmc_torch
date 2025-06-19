@@ -6,7 +6,6 @@ from hmc.train.local_classifier.baseline.valid import valid_step
 from hmc.train.utils import (
     show_global_loss,
     show_local_losses,
-    show_local_score,
 )
 
 
@@ -105,7 +104,7 @@ def train_step(args):
         if epoch % args.epochs_to_evaluate == 0:
             local_val_losses, local_val_score = valid_step(args)
             show_local_losses(local_val_losses, dataset="Val")
-            # show_local_score(local_val_score, dataset="Val")
+            show_local_score(local_val_score, dataset="Val")
 
             if not any(args.level_active):
                 logging.info("All levels have triggered early stopping.")
