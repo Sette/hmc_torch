@@ -59,7 +59,7 @@ class BuildClassification(nn.Module):
         return self.classifier(x)
 
 
-class HMCLocalModel(nn.Module):
+class HMCLocalConstrainedModel(nn.Module):
     def __init__(
         self,
         levels_size,
@@ -68,19 +68,20 @@ class HMCLocalModel(nn.Module):
         num_layers=None,
         dropout=None,
         active_levels=None,
+        all_matrix_r=None,
     ):
-        super(HMCLocalModel, self).__init__()
+        super(HMCLocalConstrainedModel, self).__init__()
         if not input_size:
-            print("input_size is None, error in HMCLocalClassificationModel")
+            print("input_size is None, error in HMCLocalConstrainedModel")
             raise ValueError("input_size is None")
         if not levels_size:
             print("levels_size is None, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is None")
         if not isinstance(levels_size, dict):
-            print("levels_size is not a dict, error in HMCLocalClassificationModel")
+            print("levels_size is not a dict, error in HMCLocalConstrainedModel")
             raise ValueError("levels_size is not a dict")
         if active_levels is None:
-            print("active_levels is not valid, error in HMCLocalClassificationModel")
+            print("active_levels is not valid, error in HMCLocalConstrainedModel")
             raise ValueError("active_levels is not valid")
 
         self.input_size = input_size
@@ -91,8 +92,9 @@ class HMCLocalModel(nn.Module):
         self.levels = nn.ModuleDict()
         self.active_levels = active_levels
         self.max_depth = len(levels_size)
+        self.all_matrix_r = all_matrix_r
         logging.info(
-            "HMCLocalModel: input_size=%s, levels_size=%s, "
+            "HMCLocalConstrainedModel: input_size=%s, levels_size=%s, "
             "hidden_size=%s, num_layers=%s, dropout=%s, "
             "active_levels=%s",
             input_size,
@@ -115,7 +117,11 @@ class HMCLocalModel(nn.Module):
         outputs = {}
         for index, level in self.levels.items():
             local_output = level(x)
-            outputs[index] = local_output
+            if self.training:
+                constrained_out = local_output
+            else:
+                constrained_out = get_constr_out(x, self.all_matrix_r[index])
+            outputs[index] = constrained_out
         return outputs
 
 
