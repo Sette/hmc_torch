@@ -56,12 +56,9 @@ def test_step(args):
 
             for index in args.active_levels:
                 output = outputs[str(index)].to("cpu")
-                constr_output = get_constr_out(
-                    output, args.hmc_dataset.all_matrix_r[index]
-                )
                 target = targets[index].to("cpu")
                 local_inputs[index].append(target)
-                local_outputs[index].append(constr_output)
+                local_outputs[index].append(output)
         Y_true_global.append(global_targets)
         # Concat all outputs and targets by level
     local_inputs = {
