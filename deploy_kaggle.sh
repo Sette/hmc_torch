@@ -65,7 +65,8 @@ INSTALL_VENV_CHOICE=$(echo "$INSTALL_VENV_CHOICE" | tr '[:upper:]' '[:lower:]')
 if [ "$INSTALL_VENV_CHOICE" = "y" ]; then
     ssh "$REMOTE_HOST" "
         source ~/.bashrc &&
-        apt install -y python3.10-venv &&
+        apt update &&
+        apt install -y python3-venv &&
         cd $REMOTE_PATH &&
         python3 -m venv .venv \
     "

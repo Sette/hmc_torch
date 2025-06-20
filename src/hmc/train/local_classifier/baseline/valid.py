@@ -50,7 +50,7 @@ def valid_step(args):
                 if args.level_active[index]:
                     output = outputs[str(index)]
                     target = targets[index]
-                    loss = args.criterions[index](output, target.double())
+                    loss = args.criterions[index](output.double(), target)
                     local_val_losses[index] += loss
 
                     if i == 0:

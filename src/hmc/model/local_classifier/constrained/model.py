@@ -117,11 +117,16 @@ class HMCLocalConstrainedModel(nn.Module):
         outputs = {}
         for index, level in self.levels.items():
             local_output = level(x)
-            if self.training and index == 0:
-                constrained_out = local_output
+            if self.training:
+                output = local_output
             else:
-                constrained_out = get_constr_out(local_output, self.all_matrix_r[int(index)].to('cuda'))
-            outputs[index] = constrained_out
+                if index == "0":
+                    output = local_output
+                else:
+                    output = get_constr_out(
+                        local_output, self.all_matrix_r[int(index)].to("cuda")
+                    )
+            outputs[index] = output
         return outputs
 
 

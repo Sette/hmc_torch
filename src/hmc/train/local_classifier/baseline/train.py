@@ -2,7 +2,7 @@ import logging
 
 import torch
 
-from hmc.train.local_classifier.baseline.valid import valid_step
+from hmc.train.local_classifier.constrained.valid import valid_step
 from hmc.train.utils import (
     show_global_loss,
     show_local_losses,
@@ -58,6 +58,7 @@ def train_step(args):
         lr=args.lr_values[0],
         weight_decay=args.weight_decay_values[0],
     )
+    args.model.train()
 
     for epoch in range(1, args.epochs + 1):
         args.model.train()
