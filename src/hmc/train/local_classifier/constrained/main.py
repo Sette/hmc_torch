@@ -12,8 +12,8 @@ from hmc.model.local_classifier.constrained.model import HMCLocalModel
 from hmc.train.local_classifier.constrained.hpo.hpo_local import (
     optimize_hyperparameters_per_level,
 )
-from hmc.train.local_classifier.constrained.test import test_step
-from hmc.train.local_classifier.constrained.train import train_step
+from hmc.train.local_classifier.core.test import test_step
+from hmc.train.local_classifier.core.train import train_step
 
 
 def train_local(args):

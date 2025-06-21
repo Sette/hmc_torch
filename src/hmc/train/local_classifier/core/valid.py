@@ -1,7 +1,14 @@
 import logging
-
+import copy
 import torch
 from sklearn.metrics import precision_recall_fscore_support
+
+# Set a logger config
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
 
 
 def valid_step(args):
@@ -90,12 +97,12 @@ def valid_step(args):
                 logging.info("Level %d: initialized best model", i)
             if (
                 round(local_val_score[i], 4) > args.best_val_score[i]
-                and round(local_val_losses[i].item(), 4) < args.best_val_loss[i]
             ):
                 # Atualizar o melhor modelo e as melhores métricas
                 args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
                 args.best_val_score[i] = round(local_val_score[i], 4)
-                args.best_model[i] = args.model.levels[str(i)].state_dict()
+                logger.info("Deep copy model for level %d", i)
+                args.best_model[i] = copy.deepcopy(args.model.levels[str(i)].state_dict())
                 args.patience_counters[i] = 0
                 logging.info(
                     "Level %d: improved (F1 score=%.4f)", i, local_val_score[i]
@@ -103,7 +110,6 @@ def valid_step(args):
             else:
                 if (
                     round(local_val_score[i], 4) < args.best_val_score[i]
-                    or round(local_val_losses[i].item(), 4) > args.best_val_loss[i]
                 ):
                     # Incrementar o contador de paciência
                     args.patience_counters[i] += 1
