@@ -1,5 +1,5 @@
 import logging
-
+import copy
 import torch
 from sklearn.metrics import precision_recall_fscore_support
 
@@ -58,17 +58,16 @@ def valid_step(args):
             for index in args.active_levels:
                 if args.level_active[index]:
                     output = outputs[str(index)]
-                    constr_output = get_constr_out(output, args.hmc_dataset.all_matrix_r[index])
                     target = targets[index].float()
-                    loss = args.criterions[index](constr_output, target)
+                    loss = args.criterions[index](output, target)
                     local_val_losses[index] += loss
 
                     if i == 0:
-                        local_outputs[index] = constr_output.to("cpu")
+                        local_outputs[index] = output.to("cpu")
                         y_val[index] = target.to("cpu")
                     else:
                         local_outputs[index] = torch.cat(
-                            (local_outputs[index], constr_output.to("cpu")), dim=0
+                            (local_outputs[index], output.to("cpu")), dim=0
                         )
                         y_val[index] = torch.cat(
                             (y_val[index], target.to("cpu")), dim=0
@@ -100,12 +99,12 @@ def valid_step(args):
                 logging.info("Level %d: initialized best model", i)
             if (
                 round(local_val_score[i], 4) > args.best_val_score[i]
-                and round(local_val_losses[i].item(), 4) < args.best_val_loss[i]
             ):
                 # Atualizar o melhor modelo e as melhores métricas
                 args.best_val_loss[i] = round(local_val_losses[i].item(), 4)
                 args.best_val_score[i] = round(local_val_score[i], 4)
-                args.best_model[i] = args.model.levels[str(i)].state_dict()
+                logger.info("Deep copy model for level %d", i)
+                args.best_model[i] = copy.deepcopy(args.model.levels[str(i)].state_dict())
                 args.patience_counters[i] = 0
                 logging.info(
                     "Level %d: improved (F1 score=%.4f)", i, local_val_score[i]
@@ -113,7 +112,6 @@ def valid_step(args):
             else:
                 if (
                     round(local_val_score[i], 4) < args.best_val_score[i]
-                    or round(local_val_losses[i].item(), 4) > args.best_val_loss[i]
                 ):
                     # Incrementar o contador de paciência
                     args.patience_counters[i] += 1
