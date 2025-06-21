@@ -137,7 +137,6 @@ def train_step(args):
         if epoch % args.epochs_to_evaluate == 0:
             local_val_losses, local_val_score = valid_step(args)
             show_local_losses(local_val_losses, dataset="Val")
-            test_step(args)
             
             # show_local_score(local_val_score, dataset="Val")
 
