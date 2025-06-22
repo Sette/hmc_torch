@@ -94,6 +94,7 @@ def optimize_hyperparameters_per_level(args):
             "num_layers": num_layers,
             "dropout": dropout,
             "active_levels": active_levels_train,
+            "all_matrix"
         }
 
         args.model = HMCLocalModel(**params).to(args.device)

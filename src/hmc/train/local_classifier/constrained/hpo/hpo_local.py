@@ -5,7 +5,7 @@ import optuna
 import torch
 from sklearn.metrics import average_precision_score, precision_recall_fscore_support
 
-from hmc.model.local_classifier.baseline.model import HMCLocalModelHPO
+from hmc.model.local_classifier.constrained.model import HMCLocalModel
 from hmc.train.utils import (
     create_job_id_name,
     save_dict_to_json,
@@ -94,9 +94,10 @@ def optimize_hyperparameters_per_level(args):
             "num_layers": num_layers,
             "dropout": dropout,
             "active_levels": active_levels_train,
+            "all_matrix_r": args.hmc_dataset.all_matrix_r,
         }
 
-        args.model = HMCLocalModelHPO(**params).to(args.device)
+        args.model = HMCLocalModel(**params).to(args.device)
 
         optimizer = torch.optim.Adam(
             args.model.parameters(),
