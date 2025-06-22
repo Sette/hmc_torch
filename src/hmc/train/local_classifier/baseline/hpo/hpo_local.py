@@ -5,7 +5,7 @@ import optuna
 import torch
 from sklearn.metrics import average_precision_score, precision_recall_fscore_support
 
-from hmc.model.local_classifier.baseline.model import HMCLocalModelHPO
+from hmc.model.local_classifier.baseline.model import HMCLocalModel
 from hmc.train.utils import (
     create_job_id_name,
     save_dict_to_json,
@@ -96,7 +96,7 @@ def optimize_hyperparameters_per_level(args):
             "active_levels": active_levels_train,
         }
 
-        args.model = HMCLocalModelHPO(**params).to(args.device)
+        args.model = HMCLocalModel(**params).to(args.device)
 
         optimizer = torch.optim.Adam(
             args.model.parameters(),
@@ -109,12 +109,13 @@ def optimize_hyperparameters_per_level(args):
         args.criterions = [criterion.to(args.device) for criterion in args.criterions]
 
         patience = args.patience if args.patience is not None else 3
-        patience_counter = patience
+        patience_counter = 0
         level_active = [False] * args.hmc_dataset.max_depth
         level_active[level] = True
 
         best_val_loss = float("inf")
         best_val_f1 = 0.0
+        threshold = 0.3
         # best_val_precision = 0.0
 
         logging.info("Levels to evaluate: %s", args.active_levels)
@@ -159,19 +160,18 @@ def optimize_hyperparameters_per_level(args):
                 local_val_loss, local_val_f1 = val_optimizer(args)
                 if (
                     round(local_val_f1, 4) > best_val_f1
-                    and local_val_loss < best_val_loss
                 ):
                     best_val_f1 = round(local_val_f1, 4)
-                    best_val_loss = local_val_loss
-                    patience_counter = patience
+                    best_val_loss = local_val_loss.item()
+                    patience_counter = 0
                 else:
                     if (
                         round(local_val_f1, 4) < best_val_f1
-                        or local_val_loss > best_val_loss
+                        or round(local_val_loss.item(), 4) > best_val_loss
                     ):
-                        patience_counter -= 1
+                        patience_counter += 1
 
-                if patience_counter == 0:
+                if patience_counter >= patience:
                     logging.info(
                         "Early stopping triggered for trial %d at epoch %d.",
                         trial.number,
@@ -260,6 +260,7 @@ def val_optimizer(args):
     y_val = 0.0
     local_val_precision = 0.0
     local_val_f1 = 0.0
+    theshold = 0.3
 
     with torch.no_grad():
         for level, (inputs, targets, _) in enumerate(args.val_loader):
@@ -283,7 +284,7 @@ def val_optimizer(args):
     local_val_precision = average_precision_score(y_val, output_val, average="micro")
     score = precision_recall_fscore_support(
         y_val.numpy(),
-        output_val.numpy() > 0.5,
+        output_val.data > theshold,
         average="micro",
     )
     local_val_f1 = score[2]
