@@ -57,6 +57,7 @@ def train_local(args):
     hmc_dataset = initialize_dataset_experiments(
         args.dataset_name,
         device=args.device,
+        dataset_path=args.dataset_path,
         dataset_type="arff",
         is_global=False,
     )

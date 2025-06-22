@@ -72,13 +72,13 @@ class ConstrainedHMCLocalModel(nn.Module):
     ):
         super(ConstrainedHMCLocalModel, self).__init__()
         if not input_size:
-            print("input_size is None, error in HMCLocalClassificationModel")
+            print("input_size is None, error in HMCLocalConstrainedModel")
             raise ValueError("input_size is None")
         if not levels_size:
             print("levels_size is None, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is None")
         if active_levels is None:
-            print("active_levels is not valid, error in HMCLocalClassificationModel")
+            print("active_levels is not valid, error in HMCLocalConstrainedModel")
             raise ValueError("active_levels is not valid")
 
         self.input_size = input_size
@@ -101,7 +101,7 @@ class ConstrainedHMCLocalModel(nn.Module):
             dropout = {level: dropout for level in active_levels}
             
         logging.info(
-            "HMCLocalModel: input_size=%s, levels_size=%s, "
+            "HMCLocalConstrainedModel: input_size=%s, levels_size=%s, "
             "hidden_size=%s, num_layers=%s, dropout=%s, "
             "active_levels=%s",
             input_size,

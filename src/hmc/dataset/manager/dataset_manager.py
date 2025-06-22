@@ -44,21 +44,37 @@ class HMCDatasetManager:
             None,
             None,
         )
-        self.levels, self.levels_size, self.nodes_idx, self.local_nodes_idx = (
+
+        (
+            self.levels,
+            self.levels_size,
+            self.nodes_idx,
+            self.local_nodes_idx,
+            self.edges_matrix_dict,
+            self.all_matrix_r,
+        ) = (
+            {},
+            {},
             {},
             {},
             {},
             {},
         )
-        self.labels, self.roots, self.nodes, self.g_t, self.A, self.edges_matrix, self.all_matrix_r = (
-            [],
-            [],
+
+        (
+            self.labels,
+            self.roots,
+            self.nodes,
+            self.g_t,
+            self.A,
+        ) = (
             [],
             [],
             [],
             [],
             [],
         )
+
         self.to_skip = to_skip
         # Initialize attributes
         self.is_global = is_global
@@ -119,7 +135,6 @@ class HMCDatasetManager:
         self.g_t = self.g.reverse()
 
         # Save networkx graph
-        # Para salvar em formato GraphML
         # nx.write_graphml(self.g, self.graph_path)
 
         self.A = nx.to_numpy_array(self.g, nodelist=self.nodes)
@@ -148,13 +163,13 @@ class HMCDatasetManager:
         for idx, level_nodes in self.levels.items():
             self.local_nodes_idx[idx] = {node: i for i, node in enumerate(level_nodes)}
 
-    def compute_matrix_R(self, edges):
+    def compute_matrix_R(self, edges_matrix):
         # Compute matrix of ancestors R, named matrix_r
         # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        matrix_r = np.zeros(edges.shape)
+        matrix_r = np.zeros(edges_matrix.shape)
         np.fill_diagonal(matrix_r, 1)
-        g = nx.DiGraph(edges)
-        for i in range(len(edges)):
+        g = nx.DiGraph(edges_matrix)
+        for i in range(len(edges_matrix)):
             descendants = list(nx.descendants(g, i))
             if descendants:
                 matrix_r[i, descendants] = 1
@@ -167,14 +182,12 @@ class HMCDatasetManager:
     def compute_matrix_R_local(self):
         # Compute the list with local matrix of ancestors R, named matrix_r
         # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-        all_matrix_r = {}
-        for idx, edges in self.edges_matrix.items():
-            matrix_r = self.compute_matrix_R(edges)
+        for idx, edges_matrix in self.edges_matrix_dict.items():
+            matrix_r = self.compute_matrix_R(edges_matrix)
             logger.info(
                 "Computed matrix R for level %d with shape %s", idx, matrix_r.shape
             )
-            all_matrix_r[idx] = matrix_r
-        return all_matrix_r
+            self.all_matrix_r[idx] = matrix_r
 
     def transform_labels(self, dataset_labels):
         y_local_ = []
@@ -257,8 +270,9 @@ class HMCDatasetManager:
         self.valid = HMCDatasetArff(self.valid_file, is_go=self.is_go)
         self.test = HMCDatasetArff(self.test_file, is_go=self.is_go)
         self.A = self.train.A
-        self.edges_matrix = self.train.edges_matrix
-        self.all_matrix_r = self.compute_matrix_R_local()
+        self.edges_matrix_dict = self.train.edges_matrix_dict
+        self.compute_matrix_R_local()
+        logger.info(self.all_matrix_r)
         self.to_eval = self.train.to_eval
         self.nodes = self.train.g.nodes()
         self.local_nodes_idx = self.train.local_nodes_idx
@@ -273,6 +287,7 @@ class HMCDatasetManager:
 def initialize_dataset_experiments(
     name: str,
     device: str = "cpu",
+    dataset_path: str = "data/",
     dataset_type="torch",
     is_global: bool = False,
 ) -> HMCDatasetManager:
@@ -290,7 +305,7 @@ def initialize_dataset_experiments(
     - HMCDatasetManager: Initialized dataset manager.
     """
     # Load dataset paths
-    datasets = get_dataset_paths(dataset_path="./data", dataset_type=dataset_type)
+    datasets = get_dataset_paths(dataset_path=dataset_path, dataset_type=dataset_type)
 
     # Validate if the dataset exists
     if name not in datasets:

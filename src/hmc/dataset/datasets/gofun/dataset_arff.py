@@ -14,6 +14,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 def get_depth_by_root(g_t, t, roots):
     for root in roots:
         depth = nx.shortest_path_length(g_t, t, root)
@@ -30,7 +31,7 @@ class HMCDatasetArff:
             self.Y,
             self.Y_local,
             self.A,
-            self.edges_matrix,
+            self.edges_matrix_dict,
             self.terms,
             self.g,
             self.levels,
@@ -47,7 +48,7 @@ class HMCDatasetArff:
 
 
 def parse_arff(arff_file, is_go=False):
-    with open(arff_file) as f:
+    with open(arff_file, "r", encoding="utf-8") as f:
         read_data = False
         X = []
         Y = []
@@ -172,22 +173,27 @@ def parse_arff(arff_file, is_go=False):
                 Y_local.append([np.stack(y) for y in y_local_])
         X = np.array(X)
         Y = np.stack(Y)
-        edges_matrix = {}
+        edges_matrix_dict = {}
         for idx, level_nodes in enumerate(levels.values()):
             if idx != 0:
                 level_nodes = [node.replace("/", ".") for node in level_nodes]
-                edges_matrix[idx] = np.array(nx.to_numpy_array(g, nodelist=level_nodes))
-        
-        
+                edges_matrix_dict[idx] = np.array(
+                    nx.to_numpy_array(g, nodelist=level_nodes)
+                )
+
+        logger.info(
+            "Shape of edges matrix: %s",
+            {k: v.shape for k, v in edges_matrix_dict.items()},
+        )
         logger.info("Parsed ARFF file: %s", arff_file)
-        logger.info("Number of matrix: %d", len(edges_matrix))
+        logger.info("Number of matrix: %d", len(edges_matrix_dict))
 
         return (
             X,
             Y,
             Y_local,
             np.array(nx.to_numpy_array(g, nodelist=nodes)),
-            edges_matrix,
+            edges_matrix_dict,
             nodes,
             g,
             levels,

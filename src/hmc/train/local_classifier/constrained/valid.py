@@ -58,17 +58,16 @@ def valid_step(args):
             for index in args.active_levels:
                 if args.level_active[index]:
                     output = outputs[str(index)]
-                    constr_output = get_constr_out(output, args.hmc_dataset.all_matrix_r[index])
-                    target = targets[index].float()
-                    loss = args.criterions[index](constr_output, target)
+                    target = targets[index]
+                    loss = args.criterions[index](output, target)
                     local_val_losses[index] += loss
 
                     if i == 0:
-                        local_outputs[index] = constr_output.to("cpu")
+                        local_outputs[index] = output.to("cpu")
                         y_val[index] = target.to("cpu")
                     else:
                         local_outputs[index] = torch.cat(
-                            (local_outputs[index], constr_output.to("cpu")), dim=0
+                            (local_outputs[index], output.to("cpu")), dim=0
                         )
                         y_val[index] = torch.cat(
                             (y_val[index], target.to("cpu")), dim=0
