@@ -8,6 +8,8 @@ from hmc.model.global_classifier.constrained.utils import get_constr_out
 
 from hmc.model.global_classifier.constrained.utils import get_constr_out
 
+from hmc.model.global_classifier.constrained.utils import get_constr_out
+
 
 class ConstrainedModel(nn.Module):
     """C-HMCNN(h) model - during training it returns the not-constrained

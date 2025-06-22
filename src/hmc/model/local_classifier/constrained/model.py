@@ -59,7 +59,7 @@ class BuildClassification(nn.Module):
         return self.classifier(x)
 
 
-class HMCLocalModel(nn.Module):
+class ConstrainedHMCLocalModel(nn.Module):
     def __init__(
         self,
         levels_size,
@@ -68,17 +68,15 @@ class HMCLocalModel(nn.Module):
         num_layers=None,
         dropout=None,
         active_levels=None,
+        all_matrix_r=None,
     ):
-        super(HMCLocalModel, self).__init__()
+        super(ConstrainedHMCLocalModel, self).__init__()
         if not input_size:
             print("input_size is None, error in HMCLocalClassificationModel")
             raise ValueError("input_size is None")
         if not levels_size:
             print("levels_size is None, error in HMCLocalClassificationModel")
             raise ValueError("levels_size is None")
-        if not isinstance(levels_size, dict):
-            print("levels_size is not a dict, error in HMCLocalClassificationModel")
-            raise ValueError("levels_size is not a dict")
         if active_levels is None:
             print("active_levels is not valid, error in HMCLocalClassificationModel")
             raise ValueError("active_levels is not valid")
@@ -88,9 +86,20 @@ class HMCLocalModel(nn.Module):
         self.mum_layers = num_layers
         self.hidden_size = hidden_size
         self.dropout = dropout
+        self.all_matrix_r = all_matrix_r
         self.levels = nn.ModuleDict()
         self.active_levels = active_levels
-        self.max_depth = len(levels_size)
+        if isinstance(levels_size, int):
+            levels_size = {level: levels_size for level in active_levels}
+        else:
+            self.max_depth = len(levels_size)
+        if isinstance(hidden_size, int):
+            hidden_size = {level: hidden_size for level in active_levels}
+        if isinstance(num_layers, int):
+            num_layers = {level: num_layers for level in active_levels}
+        if isinstance(dropout, float):
+            dropout = {level: dropout for level in active_levels}
+            
         logging.info(
             "HMCLocalModel: input_size=%s, levels_size=%s, "
             "hidden_size=%s, num_layers=%s, dropout=%s, "
@@ -114,65 +123,12 @@ class HMCLocalModel(nn.Module):
     def forward(self, x):
         outputs = {}
         for index, level in self.levels.items():
-            local_output = level(x)
+            if self.training:
+                # During training, we return the not-constrained output
+                local_output = level(x)
+            else:
+                # During inference, we return the constrained output
+                local_output = get_constr_out(level(x), self.all_matrix_r[int(index)])
             outputs[index] = local_output
         return outputs
 
-
-class HMCLocalModelHPO(nn.Module):
-    def __init__(
-        self,
-        levels_size,
-        input_size=None,
-        hidden_size=None,
-        num_layers=None,
-        dropout=None,
-        active_levels=None,
-    ):
-        super(HMCLocalModelHPO, self).__init__()
-        if not input_size:
-            print("input_size is None, error in HMCLocalClassificationModel")
-            raise ValueError("input_size is None")
-        if not levels_size:
-            print("levels_size is None, error in HMCLocalClassificationModel")
-            raise ValueError("levels_size is None")
-        if not isinstance(levels_size, int):
-            print("levels_size is not an int, error in HMCLocalClassificationModel")
-            raise ValueError("levels_size is not an int")
-        if active_levels is None:
-            print("active_levels is not valid, error in HMCLocalClassificationModel")
-            raise ValueError("active_levels is not valid")
-
-        self.input_size = input_size
-        self.levels_size = levels_size
-        self.mum_layers = num_layers
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.levels = nn.ModuleDict()
-        self.active_levels = active_levels
-        logging.info(
-            "HMCLocalModel: input_size=%s, levels_size=%s, "
-            "hidden_size=%s, num_layers=%s, dropout=%s, "
-            "active_levels=%s",
-            input_size,
-            levels_size,
-            hidden_size,
-            num_layers,
-            dropout,
-            active_levels,
-        )
-        for index in active_levels:
-            self.levels[str(index)] = BuildClassification(
-                input_shape=input_size,
-                hidden_size=hidden_size,
-                output_size=levels_size,
-                nb_layers=num_layers,
-                dropout_rate=dropout,
-            )
-
-    def forward(self, x):
-        outputs = {}
-        for index, level in self.levels.items():
-            local_output = level(x)
-            outputs[index] = local_output
-        return outputs
