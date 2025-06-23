@@ -128,7 +128,10 @@ class ConstrainedHMCLocalModel(nn.Module):
                 local_output = level(x)
             else:
                 # During inference, we return the constrained output
-                local_output = get_constr_out(level(x), self.all_matrix_r[int(index)])
+                if index in self.all_matrix_r:
+                    local_output = get_constr_out(level(x), self.all_matrix_r[index])
+                else:
+                    local_output = level(x)
             outputs[index] = local_output
         return outputs
 
