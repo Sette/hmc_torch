@@ -261,6 +261,7 @@ def val_optimizer(args):
     y_val = 0.0
     local_val_precision = 0.0
     local_val_f1 = 0.0
+    theshold = 0.3
 
     with torch.no_grad():
         for level, (inputs, targets, _) in enumerate(args.val_loader):
@@ -284,7 +285,7 @@ def val_optimizer(args):
     local_val_precision = average_precision_score(y_val, output_val, average="micro")
     score = precision_recall_fscore_support(
         y_val.numpy(),
-        output_val.numpy() > 0.5,
+        output_val.data > theshold,
         average="micro",
     )
     local_val_f1 = score[2]
