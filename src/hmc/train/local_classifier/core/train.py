@@ -9,6 +9,8 @@ from hmc.train.utils import (
     show_local_score,
 )
 
+from hmc.model.local_classifier.constrained.model import get_constr_out
+
 
 def train_step(args):
     """
@@ -36,6 +38,7 @@ def train_step(args):
             - epochs: Number of training epochs.
             - train_loader: DataLoader for training data.
             - epochs_to_evaluate: Frequency of validation evaluation.
+            - constrained: Boolean indicating if the model is constrained.
             - Additional attributes used for logging and early stopping.
     """
 
@@ -54,15 +57,11 @@ def train_step(args):
     args.best_model = [None] * args.max_depth
     logging.info("Best val loss created %s", args.best_val_loss)
 
-    optimizers = [
-        torch.optim.Adam(
-            model.parameters(),
-            lr=args.lr_values[int(idx)],
-            weight_decay=args.weight_decay_values[int(idx)],
-        )
-        for idx, model in args.model.levels.items()
-    ]
-    args.optimizers = optimizers
+    optimizer = torch.optim.Adam(
+        args.model.parameters(),
+        lr=args.lr_values[0],
+        weight_decay=args.weight_decay_values[0],
+    )
 
     for epoch in range(1, args.epochs + 1):
         args.model.train()
@@ -78,24 +77,35 @@ def train_step(args):
             outputs = args.model(inputs.float())
 
             # Zerar os gradientes antes de cada batch
-            # args.optimizer.zero_grad()
-            for optimizer in args.optimizers:
-                optimizer.zero_grad()
+            optimizer.zero_grad()
             for index in args.active_levels:
                 if args.level_active[index]:
                     output = outputs[str(index)]
-                    target = targets[index].float()
+                    target = targets[index]
 
-                    loss = args.criterions[index](output, target)
+                    if args.constrained and index != 0:
+                        constr_output = get_constr_out(
+                            output, args.hmc_dataset.all_matrix_r[index].to(args.device)
+                        )
+                        train_output = target * output.double()
+                        train_output = get_constr_out(
+                            train_output,
+                            args.hmc_dataset.all_matrix_r[index].to(args.device),
+                        )
+                        train_output = (
+                            1 - target
+                        ) * constr_output.double() + target * train_output
+                    else:
+                        train_output = output
+
+                    loss = args.criterions[index](train_output.double(), target)
                     local_train_losses[index] += loss
 
         # Backward pass (cálculo dos gradientes)
         for i, total_loss in enumerate(local_train_losses):
             if i in args.active_levels and args.level_active[i]:
                 total_loss.backward()
-        # args.optimizer.step()
-        for optimizer in args.optimizers:
-            optimizer.step()
+        optimizer.step()
 
         local_train_losses = [
             loss / len(args.train_loader) for loss in local_train_losses
