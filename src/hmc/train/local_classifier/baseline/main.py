@@ -125,6 +125,7 @@ def train_local(args):
     args.input_dim = args.input_dims[args.data]
     args.max_depth = hmc_dataset.max_depth
     args.to_eval = hmc_dataset.to_eval
+    args.constrained = False
     if args.active_levels is None:
         args.active_levels = [i for i in range(args.max_depth)]
     else:
